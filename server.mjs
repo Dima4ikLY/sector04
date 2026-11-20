@@ -231,6 +231,7 @@ export function createArenaServer({
       if(requireHttps&&scheme!=='https'&&(viaProxy||!isLoopback(peer)||!localHost(req.headers.host))){
         return json(res,403,{error:'Для доступа к игре откройте адрес с HTTPS.'});
       }
+      if(req.method==='GET'&&url.pathname==='/api/online')return json(res,200,{online:sessions.size});
       if(req.method==='GET'&&url.pathname==='/api/health')return json(res,200,{ok:true,app:'sector04',rooms:rooms.size});
       if(req.method==='GET'&&url.pathname==='/api/rooms'){
         const now=performance.now();

@@ -243,6 +243,21 @@ for(const button of mapModes)button.onclick=()=>{
   selectedMatchMode=button.dataset.matchMode;
   showMapPreview(lobbyMap(selectedMatchMode));
 };
+const onlineCount=$('onlineCount');
+let onlineRefresh=false;
+async function refreshOnline(){
+  if(onlineRefresh||!onlineCount?.isConnected)return;
+  onlineRefresh=true;
+  try{
+    const response=await fetch('/api/online',{signal:AbortSignal.timeout(4000),cache:'no-store'});
+    if(!response.ok)return;
+    const data=await response.json();
+    if(onlineCount.isConnected&&Number.isFinite(data?.online))onlineCount.textContent=String(Math.max(0,Math.trunc(data.online)));
+  }catch{}
+  finally{onlineRefresh=false;}
+}
+refreshOnline();
+setInterval(refreshOnline,12000);
 showMapPreview(selectedMap);
 function toast(message){$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,3500);}
 async function api(route,data){let response;try{response=await fetch(`/api/${route}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),signal:AbortSignal.timeout(4000)});}catch(error){throw new Error(error.name==='TimeoutError'?'Сервер не ответил вовремя. Попробуй ещё раз.':'Нет связи с сервером. Проверь подключение.');}const result=await response.json();if(!response.ok){const error=new Error(result.error||'Сервер недоступен');error.status=response.status;throw error;}return result;}
