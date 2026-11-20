@@ -1,0 +1,33 @@
+.emblem-picker {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 10px 0 18px;
+}
+.emblem-picker button {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 2px;
+  border: 1px solid #c5d6b5;
+  background: #f4f8ed;
+  color: #486a32;
+}
+.emblem-picker button.selected {
+  background: #e2edcf;
+  border-color: #83a854;
+  box-shadow: inset 0 0 0 1px #9ebd75;
+}
+.emblem-picker canvas {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+}
+.emblem-picker button span {
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+}

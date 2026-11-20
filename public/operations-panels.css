@@ -1,0 +1,456 @@
+:root {
+  --ops-bg: #131a22;
+  --ops-surface: #171f28;
+  --ops-raised: #1d2732;
+  --ops-deep: #10151b;
+  --ops-border: #33424f;
+  --ops-soft-border: #283640;
+  --ops-text: #eef2f4;
+  --ops-muted: #a4b1bc;
+  --ops-accent: #f1aa56;
+  --ops-accent-tint: #33281f;
+  --ops-info: #a9cfdf;
+  --ops-danger: #ffac99;
+}
+
+:is(#loginDialog, #shopDialog, #appearanceDialog, #helpDialog, .settings-dialog, .history-dialog) {
+  color-scheme: dark;
+  max-width: calc(100% - 32px);
+  max-height: min(90dvh, 940px);
+  overflow: auto;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--ops-border);
+  border-radius: 8px;
+  background: var(--ops-bg);
+  color: var(--ops-text);
+  box-shadow: 0 24px 100px #05080bd9, inset 0 1px #ffffff0d;
+}
+
+:is(#loginDialog, #shopDialog, #appearanceDialog, #helpDialog, .settings-dialog, .history-dialog)::backdrop {
+  background: #080d14c7;
+  backdrop-filter: blur(5px);
+}
+
+:where(#loginDialog, #shopDialog, #appearanceDialog, #helpDialog, .settings-dialog, .history-dialog) :is(p, .muted) {
+  color: var(--ops-muted);
+  line-height: 1.55;
+}
+
+:is(#loginDialog, #shopDialog, #appearanceDialog, #helpDialog, .settings-dialog, .history-dialog) :is(button, input, select, summary):focus-visible,
+:is(.room-browser, .practice-guide-panel, .range-tools) :is(button, select, summary):focus-visible {
+  outline: 2px solid var(--ops-accent);
+  outline-offset: 3px;
+}
+
+:is(#loginDialog, #shopDialog, #appearanceDialog, #helpDialog, .settings-dialog, .history-dialog) :is(.field-label, .card-kicker, .eyebrow) {
+  color: var(--ops-muted);
+  font: 600 10px var(--mono, monospace);
+  letter-spacing: .11em;
+}
+
+:is(#loginDialog, #shopDialog, #appearanceDialog, #helpDialog, .settings-dialog, .history-dialog) :is(.error, .shop-notice) {
+  color: var(--ops-danger);
+}
+
+:is(#shopDialog, #appearanceDialog, .settings-dialog, .history-dialog) :is(.shop-header, .settings-header, .history-header) {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  min-height: 78px;
+  padding: 18px clamp(16px, 3vw, 30px);
+  border-bottom: 1px solid var(--ops-soft-border);
+  background: var(--ops-surface);
+  color: var(--ops-text);
+}
+
+:is(#shopDialog, #appearanceDialog, .settings-dialog, .history-dialog) :is(.shop-header, .settings-header, .history-header) h2,
+#helpDialog h2,
+#loginDialog h2 {
+  margin: 3px 0 0;
+  color: var(--ops-text);
+  font-size: clamp(23px, 3.2vw, 32px);
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -.035em;
+}
+
+:is(#shopDialog, #appearanceDialog, #helpDialog, .settings-dialog, .history-dialog) .icon-btn {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--ops-border);
+  border-radius: 5px;
+  background: var(--ops-raised);
+  color: var(--ops-text);
+  font: 400 22px/1 Arial, sans-serif;
+}
+
+:is(#shopDialog, #appearanceDialog, #helpDialog, .settings-dialog, .history-dialog) .icon-btn:hover {
+  border-color: var(--ops-accent);
+  color: var(--ops-accent);
+}
+
+:is(#loginDialog, #shopDialog, #appearanceDialog, .settings-dialog) :is(.primary, .secondary) {
+  min-height: 38px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: normal;
+}
+
+:is(#loginDialog, #shopDialog, #appearanceDialog, .settings-dialog) .primary {
+  border-color: #f3bb7a;
+  background: var(--ops-accent);
+  color: #21150d;
+}
+
+:is(#loginDialog, #shopDialog, #appearanceDialog, .settings-dialog) .primary:hover {
+  background: #ffc17a;
+}
+
+:is(#shopDialog, #appearanceDialog, .settings-dialog) .secondary {
+  border-color: var(--ops-border);
+  background: var(--ops-raised);
+  color: var(--ops-text);
+}
+
+:is(#shopDialog, #appearanceDialog, .settings-dialog) .secondary:hover {
+  border-color: #647485;
+  background: #26323e;
+}
+
+:is(#loginDialog, #shopDialog, #appearanceDialog, .settings-dialog) button:disabled {
+  cursor: default;
+  opacity: 1;
+  border-color: var(--ops-soft-border);
+  background: #1a222b;
+  color: #9caab7;
+}
+
+#loginDialog {
+  width: 445px;
+  padding: clamp(22px, 5vw, 34px);
+  background: radial-gradient(ellipse at 8% 0, #2b251f 0, transparent 58%), var(--ops-bg);
+  box-shadow: 0 28px 90px #05080bd9, inset 0 2px var(--ops-accent);
+}
+
+#loginDialog h2 { margin: 0 0 16px; }
+#loginDialog > p { font-size: 13px; line-height: 1.5; margin: 12px 0; }
+#loginForm .field-label { margin: 14px 0 6px; }
+.auth-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.auth-modes button {
+  min-height: 44px;
+  padding: 6px 4px;
+  border: 1px solid var(--ops-border);
+  border-radius: 4px;
+  background: var(--ops-deep);
+  color: var(--ops-muted);
+  font-size: clamp(10px, 3vw, 13px);
+  line-height: 1.25;
+}
+.auth-modes button[aria-pressed="true"] {
+  border-color: var(--ops-accent);
+  background: #342a20;
+  color: var(--ops-text);
+}
+
+#loginForm input {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--ops-border);
+  border-radius: 4px;
+  background: var(--ops-deep);
+  color: var(--ops-text);
+}
+
+#loginForm input::placeholder { color: #8494a2; }
+#loginForm > small { color: var(--ops-muted); font-size: 11px; }
+#loginSubmit { margin-top: 17px; }
+#loginError:empty { display: none; }
+
+#helpDialog { width: 610px; padding: clamp(18px, 4vw, 30px); }
+#helpDialog h2 { padding-right: 39px; margin-bottom: 16px; }
+#helpDialog > p { padding: 10px 0 0; margin: 10px 0; border-top: 1px solid var(--ops-soft-border); font-size: 13px; }
+#helpDialog strong { color: var(--ops-text); }
+#helpDialog .close-dialog { top: 12px; right: 12px; }
+
+#shopDialog { width: min(1060px, calc(100% - 32px)); padding: 0; }
+#shopDialog h2 em { color: var(--ops-accent); }
+#shopDialog .shop-layout { grid-template-columns: minmax(190px, 220px) minmax(0, 1fr); }
+#shopDialog .shop-summary { padding: 22px 18px; background: #151c25; border-color: var(--ops-soft-border); }
+#shopDialog .shop-summary h3 { margin: 9px 0 20px; color: var(--ops-text); font-family: inherit; font-size: 21px; }
+#shopDialog .shop-summary .terminal-dot { color: var(--ops-accent); }
+#shopDialog :is(.shop-balance, .shop-metrics, .shop-rewards) span { color: var(--ops-muted); font-size: 10px; letter-spacing: .08em; }
+#shopDialog .shop-balance > strong { color: var(--ops-accent); margin: 7px 0 17px; }
+#shopDialog .shop-metrics { flex-wrap: wrap; gap: 12px 18px; padding: 14px 0; border-color: var(--ops-soft-border); }
+#shopDialog .shop-metrics strong { color: var(--ops-text); font-size: 14px; }
+#shopDialog .shop-rewards { padding: 12px; margin: 16px 0; border: 1px solid var(--ops-soft-border); border-radius: 5px; background: var(--ops-surface); }
+#shopDialog .shop-rewards > strong { color: var(--ops-info); font-weight: 700; }
+#shopDialog .shop-rewards :is(small, i) { font-size: 10px; color: var(--ops-muted); }
+#shopDialog :is(.shop-summary > .muted, .rank-ladder, .rank-ladder > div > div) { color: var(--ops-muted); font-size: 11px; }
+#shopDialog .rank-ladder summary { min-height: 34px; padding: 6px 0; color: var(--ops-text); font-weight: 650; }
+#shopDialog .rank-ladder > div > div { border-color: var(--ops-soft-border); }
+#shopDialog .rank-ladder small { color: var(--ops-muted); font-size: 9px; }
+#shopDialog .rank-ladder strong { color: var(--ops-accent); font-size: 10px; }
+#shopDialog .shop-main { padding: clamp(13px, 2.5vw, 24px); }
+#shopDialog .shop-filters { gap: 5px; padding-bottom: 13px; margin-bottom: 14px; border-color: var(--ops-soft-border); }
+#shopDialog .shop-filters button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid var(--ops-soft-border);
+  border-radius: 4px;
+  background: var(--ops-surface);
+  color: var(--ops-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+#shopDialog .shop-filters button:hover { border-color: #586c7b; color: var(--ops-text); }
+#shopDialog .shop-filters button.active { border-color: #855d35; background: var(--ops-accent-tint); color: #ffd598; }
+#shopDialog .shop-grid { gap: clamp(9px, 1.7vw, 16px); }
+#shopDialog .weapon-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: clamp(12px, 1.6vw, 17px);
+  border: 1px solid var(--ops-soft-border);
+  border-radius: 5px;
+  background: var(--ops-surface);
+  color: var(--ops-text);
+}
+#shopDialog .weapon-card.owned { border-color: #4e6574; }
+#shopDialog .weapon-card.locked { background: #151d26; }
+#shopDialog .weapon-card-selected {
+  border-color: var(--ops-accent);
+  outline: 2px solid var(--ops-accent);
+  outline-offset: -2px;
+}
+#shopDialog .weapon-card-top {
+  align-items: baseline;
+  gap: 6px;
+  min-height: 16px;
+  color: var(--ops-muted);
+  font-size: 9px;
+  letter-spacing: .05em;
+}
+#shopDialog .weapon-card-top > span:last-child { text-align: right; color: #ffd098; }
+#shopDialog .owned .weapon-card-top > span:last-child { color: var(--ops-info); }
+#shopDialog .locked .weapon-card-top > span:last-child { color: var(--ops-muted); }
+#shopDialog .weapon-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: clamp(94px, 11vw, 126px);
+  margin: 9px 0 12px;
+  overflow: hidden;
+  border: 1px solid #303c46;
+  border-radius: 3px;
+  background:
+    radial-gradient(ellipse at 51% 45%, #45546194 0, transparent 66%),
+    linear-gradient(127deg, #19232d, #0f171f 80%);
+  color: #93a7b9;
+}
+#shopDialog .weapon-art::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  pointer-events: none;
+  border: 1px solid #b4c7d11c;
+  background: repeating-linear-gradient(0deg, transparent 0 22px, #b4c7d10d 22px 23px);
+}
+#shopDialog .weapon-art svg {
+  position: relative;
+  width: min(100%, 307px);
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  filter: drop-shadow(0 7px 3px #070a0eab);
+}
+#shopDialog .weapon-title { color: var(--ops-muted); }
+#shopDialog .weapon-title h3 { min-width: 0; color: var(--ops-text); font: 750 clamp(17px, 2vw, 23px)/1.08 system-ui, sans-serif; letter-spacing: -.04em; }
+#shopDialog .weapon-title > span { color: var(--ops-accent); font-size: 16px; }
+#shopDialog .weapon-card .weapon-description { min-height: 0; margin: 7px 0 12px; color: var(--ops-muted); font-size: 12px; line-height: 1.45; }
+#shopDialog .weapon-specs { margin-top: auto; padding: 10px 0; flex-wrap: wrap; gap: 5px; border-color: var(--ops-soft-border); color: var(--ops-muted); font-size: 9px; }
+#shopDialog .weapon-specs b { margin-left: 3px; color: var(--ops-text); font-size: 12px; }
+#shopDialog .weapon-requirements { margin: 11px 0; gap: 6px; }
+#shopDialog .weapon-requirements strong { color: var(--ops-text); font-size: 12px; }
+#shopDialog .weapon-rp-remaining { display: block; margin-top: 3px; color: var(--ops-info); font-size: inherit; }
+#shopDialog .requirement-met { color: var(--ops-info); }
+#shopDialog .requirement-missing { color: #d0aa87; }
+#shopDialog .weapon-card > button { justify-content: center; text-align: center; padding: 8px 7px; }
+#shopDialog .weapon-card.owned > button:disabled { color: var(--ops-info); }
+#shopDialog .leaderboard-head { color: var(--ops-muted); font-size: 10px; }
+#shopDialog .leaderboard-row { padding: 13px 0; color: var(--ops-text); border-color: var(--ops-soft-border); }
+#shopDialog .leaderboard-row > b { color: var(--ops-muted); }
+#shopDialog .leaderboard-row small { color: var(--ops-muted); font-size: 10px; }
+#shopDialog .leaderboard-row > strong { white-space: nowrap; color: var(--ops-accent); }
+
+#appearanceDialog { width: min(910px, calc(100% - 32px)); padding: 0; }
+#appearanceDialog .appearance-layout { grid-template-columns: minmax(0, 1fr) minmax(0, .93fr); }
+#appearanceDialog .character-stage {
+  padding: 18px;
+  border-right: 1px solid var(--ops-soft-border);
+  background: #161e27;
+}
+#appearanceDialog .preview-scene {
+  isolation: isolate;
+  margin: 0 auto;
+  max-width: 470px;
+  overflow: hidden;
+  border: 1px solid #475661;
+  border-radius: 4px;
+  background: #111923;
+}
+#appearanceDialog .preview-scene::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  inset: 7px;
+  border: 1px solid #a5bdd22e;
+}
+#appearanceDialog .character-stage > #modelMode { color: var(--ops-muted); font-size: 10px; }
+#appearanceDialog .character-stage > strong { margin: 9px 0 12px; color: var(--ops-text); font-size: 20px; }
+#appearanceDialog .animation-buttons { gap: 5px; }
+#appearanceDialog .animation-buttons button {
+  min-height: 31px;
+  border-color: var(--ops-border);
+  border-radius: 4px;
+  padding: 6px 9px;
+  background: var(--ops-raised);
+  color: var(--ops-muted);
+  font-size: 11px;
+}
+#appearanceDialog .animation-buttons button.selected { border-color: #855d35; background: var(--ops-accent-tint); color: #ffd598; }
+#appearanceDialog .preview-reload {
+  display: block;
+  width: min(100%, 160px);
+  height: 6px;
+  margin: 8px auto 0;
+  accent-color: var(--ops-accent);
+}
+#appearanceDialog .model-turn-label { margin: 15px 3px 0; color: var(--ops-muted); font-size: 12px; }
+#appearanceDialog .model-turn-label input { accent-color: var(--ops-accent); }
+#appearanceDialog .appearance-options { padding: 20px; }
+#appearanceDialog .appearance-options .field-label { margin-block: 15px 8px; }
+#appearanceDialog .appearance-options .field-label:first-child { margin-top: 0; }
+#appearanceDialog :is(.style-choices, .emblem-picker) button {
+  border: 1px solid var(--ops-soft-border);
+  border-radius: 5px;
+  background: var(--ops-raised);
+  color: var(--ops-text);
+}
+#appearanceDialog :is(.style-choices, .emblem-picker) button.selected {
+  border-color: #986939;
+  background: var(--ops-accent-tint);
+  color: #ffdbaf;
+  box-shadow: inset 0 0 0 1px #f1aa5618;
+}
+#appearanceDialog .style-choices strong { font-size: 12px; line-height: 1.25; }
+#appearanceDialog .style-choices small { margin-top: 4px; color: var(--ops-muted); font-size: 11px; line-height: 1.45; }
+#appearanceDialog #fantasyStyles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+#appearanceDialog #fantasyStyles button { display: grid; align-content: start; padding: 10px 11px; text-align: left; }
+#appearanceDialog .skin-status { margin-top: 7px; font: 600 10px var(--mono); color: var(--ops-info); }
+#appearanceDialog .skin-locked .skin-status { color: #ffd598; }
+#appearanceDialog .skin-requirement { margin: 0 0 8px; color: #ffd598; font-size: 12px; }
+#appearanceDialog .skin-requirement:empty { display: none; }
+#appearanceDialog #openSkinShop { width: 100%; margin-bottom: 10px; }
+#appearanceDialog #characterPalettes { flex-wrap: wrap; margin-bottom: 16px; }
+#appearanceDialog #characterPalettes button { width: 28px; height: 28px; border-color: var(--ops-surface); outline-color: var(--ops-border); }
+#appearanceDialog #characterPalettes button.selected { outline: 2px solid var(--ops-accent); border-color: var(--ops-surface); }
+#appearanceDialog .emblem-picker button { min-height: 51px; }
+#appearanceDialog .emblem-picker button span { color: inherit; }
+#appearanceDialog .appearance-options > .muted { margin-bottom: 14px; font-size: 11px; }
+@media (min-width: 721px) and (min-height: 650px) {
+  #appearanceDialog .character-stage { position: sticky; top: 98px; align-self: start; }
+}
+
+.settings-dialog { width: min(525px, calc(100% - 32px)); padding: 0; }
+.settings-dialog .settings-toggle,
+.settings-dialog .settings-bindings { border-color: var(--ops-soft-border); }
+.settings-dialog :is(.settings-field > label, .settings-toggle strong, .settings-bindings summary, .settings-key-list dt) { color: var(--ops-text); font-size: 13px; }
+.settings-dialog .settings-field output { color: var(--ops-accent); }
+.settings-dialog .settings-field input[type="range"],
+.settings-dialog .settings-toggle input { accent-color: var(--ops-accent); }
+.settings-dialog :is(.settings-field select, .settings-key) { border-color: var(--ops-border); border-radius: 4px; background: var(--ops-raised); color: var(--ops-text); }
+.settings-dialog .settings-key:hover,
+.settings-dialog .settings-key[aria-pressed="true"] { border-color: #9a6c3d; background: var(--ops-accent-tint); color: #ffd598; }
+.settings-dialog :is(.settings-field small, .settings-toggle small, .settings-note) { color: var(--ops-muted); font-size: 11px; }
+.settings-dialog .settings-key-status { color: var(--ops-accent); }
+.settings-dialog .settings-key-status:empty { min-height: 0; }
+
+.history-dialog { width: min(680px, calc(100% - 32px)); padding: 0; }
+.history-dialog :is(.history-hint, .history-mode, .history-date, .history-stats dt) { color: var(--ops-muted); }
+.history-dialog :is(.history-row, .history-notice) { border: 1px solid var(--ops-soft-border); border-radius: 5px; background: var(--ops-surface); }
+.history-dialog :is(.history-row-heading h3, .history-stats dd) { color: var(--ops-text); }
+.history-dialog .history-mode { white-space: normal; }
+.history-dialog .history-stats { border-color: var(--ops-soft-border); }
+.history-dialog .history-stats > div:nth-last-child(-n + 2) dd { color: var(--ops-accent); }
+
+.room-browser { color: var(--ops-text); border-color: var(--ops-soft-border); }
+.room-browser summary { min-height: 34px; color: var(--ops-text); font-size: 12px; font-weight: 650; }
+.room-browser :is(.room-browser-tools > span, .room-player-count, .room-browser-copy small, .room-browser-status, .room-browser-empty p) { color: var(--ops-muted); }
+.room-browser .room-browser-copy strong { color: var(--ops-text); font-size: 11px; }
+.room-browser :is(.room-browser-row, .room-browser-empty) { border-color: var(--ops-border); border-radius: 4px; background: var(--ops-deep); }
+.room-browser :is(.room-join, .room-refresh, .room-browser-empty .secondary) { min-height: 33px; border-color: var(--ops-border); border-radius: 4px; background: var(--ops-raised); color: var(--ops-text); }
+.room-browser .room-join:not(:disabled) { border-color: #855d35; background: var(--ops-accent-tint); color: #ffd598; }
+.room-browser :is(.room-join, .room-refresh):disabled { background: var(--ops-deep); color: var(--ops-muted); cursor: default; }
+.room-browser :is(.room-join, .room-refresh):focus-visible,
+.room-browser summary:focus-visible { outline-color: var(--ops-accent); }
+
+:is(.coop-tools, .range-stats > div, .session-card .practice-guide-panel) {
+  border-color: var(--ops-soft-border);
+  border-radius: 5px;
+  background: var(--ops-deep);
+  color: var(--ops-text);
+}
+.coop-tools :is(.coop-team-heading, .coop-team, .coop-status) { color: var(--ops-text); }
+.range-tools :is(label, .range-stats span) { color: var(--ops-muted); }
+.range-tools select { color-scheme: dark; color: var(--ops-text); border-color: var(--ops-border); border-radius: 4px; background: var(--ops-deep); }
+.practice-guide-panel :is(.practice-guide-title, .practice-guide-hint) { color: var(--ops-text); }
+.practice-guide-panel .practice-guide-counter { color: var(--ops-muted); }
+.practice-guide-panel .practice-guide-track { accent-color: var(--ops-accent); }
+.session-card .practice-guide-actions .text-btn { min-height: 32px; font-size: 11px; color: var(--ops-info); }
+
+@media (max-width: 720px) {
+  #shopDialog .shop-layout { grid-template-columns: minmax(0, 1fr); }
+  #shopDialog .shop-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px 18px;
+    padding: 15px 18px;
+    border-right: 0;
+    border-bottom: 1px solid var(--ops-soft-border);
+  }
+  #shopDialog .shop-summary > .card-kicker { grid-column: 1 / -1; }
+  #shopDialog .shop-summary h3 { grid-row: 2; margin: 2px 0; font-size: 19px; }
+  #shopDialog .shop-balance { grid-column: 2; grid-row: 2; text-align: right; }
+  #shopDialog .shop-balance > strong { margin: 2px 0 0; font-size: 22px; }
+  #shopDialog .shop-metrics { grid-column: 1; grid-row: 3; align-items: center; padding: 6px 0; border: 0; }
+  #shopDialog .shop-rewards { grid-column: 2; grid-row: 3; margin: 0; padding: 7px 9px; }
+  #shopDialog .shop-rewards > strong { margin: 3px 0; }
+  #shopDialog .shop-rewards small { font-size: 9px; }
+  #shopDialog :is(.shop-summary > .muted, .rank-ladder) { grid-column: 1 / -1; margin: 0; }
+  #appearanceDialog .appearance-layout { grid-template-columns: minmax(0, 1fr); }
+  #appearanceDialog .character-stage { border-right: 0; border-bottom: 1px solid var(--ops-soft-border); }
+  #appearanceDialog .preview-scene { max-width: 320px; }
+  #appearanceDialog .preview-scene canvas { max-width: none; }
+}
+
+@media (max-width: 520px) {
+  :is(#loginDialog, #shopDialog, #appearanceDialog, #helpDialog, .settings-dialog, .history-dialog) { max-width: calc(100% - 20px); }
+  :is(#shopDialog, #appearanceDialog, .settings-dialog, .history-dialog) :is(.shop-header, .settings-header, .history-header) { min-height: 63px; padding: 14px; }
+  #shopDialog .shop-grid { grid-template-columns: minmax(0, 1fr); }
+  #shopDialog .shop-summary { gap: 4px 12px; padding: 12px 14px; }
+  #shopDialog .shop-metrics { gap: 8px 10px; }
+  #shopDialog .shop-summary h3 { font-size: 17px; }
+  #shopDialog :is(.shop-balance, .shop-metrics, .shop-rewards) span { font-size: 9px; }
+  #shopDialog .shop-rewards > strong { font-size: 11px; }
+  #shopDialog .weapon-art { height: 108px; }
+  #appearanceDialog :is(.character-stage, .appearance-options) { padding: 14px; }
+  #appearanceDialog .animation-buttons button { min-height: 34px; }
+  .settings-dialog .settings-body { padding: 16px; }
+}

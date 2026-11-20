@@ -1,0 +1,31 @@
+{
+  "id": "/",
+  "name": "SECTOR 04 — онлайн-арена",
+  "short_name": "SECTOR 04",
+  "lang": "ru",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#11161c",
+  "theme_color": "#11161c",
+  "icons": [
+    {
+      "src": "/icons/android-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/android-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

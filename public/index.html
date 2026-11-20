@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#11161c"><meta name="description" content="SECTOR 04 — многопользовательский 2D-шутер. Каталог арен, выбор персонажа, магазин оружия и сетевые бои.">
+  <title>SECTOR 04 — онлайн-арена</title>
+  <meta property="og:title" content="SECTOR 04 — онлайн-арена">
+  <meta property="og:type" content="website">
+  <meta property="og:description" content="Многопользовательский 2D-шутер. Выбирай арену, тренируйся с ботами и играй с друзьями.">
+  <meta property="og:image" content="/art/brand/vk-link-preview-1200x630.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="SECTOR 04 — бойцы онлайн-арены на фоне промышленного комплекса">
+  <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="icon" href="/icons/favicon-16.png" type="image/png" sizes="16x16">
+  <link rel="icon" href="/icons/favicon-32.png" type="image/png" sizes="32x32">
+  <link rel="icon" href="/icons/favicon-48.png" type="image/png" sizes="48x48">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180">
+  <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#d88738">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/shop.css">
+  <link rel="stylesheet" href="/theme.css">
+  <link rel="stylesheet" href="/menu.css">
+  <link rel="stylesheet" href="/settings.css">
+  <link rel="stylesheet" href="/rooms.css">
+  <link rel="stylesheet" href="/improvements.css">
+  <link rel="stylesheet" href="/history.css">
+  <link rel="stylesheet" href="/emblems.css">
+  <link rel="stylesheet" href="/practice-guide.css">
+  <link rel="stylesheet" href="/operations-panels.css">
+  <link rel="stylesheet" href="/operations.css">
+  <link rel="preload" as="image" href="/art/brand/sector04-game-1920x1080.jpg" media="(aspect-ratio > 4/5)">
+  <link rel="preload" as="image" href="/art/brand/vk-story-1080x1920.jpg" media="(max-aspect-ratio: 4/5)">
+  <link rel="modulepreload" href="/app.mjs">
+  <script type="module" src="/startup.mjs"></script>
+</head>
+<body>
+  <section class="startup-screen" id="startupScreen" aria-label="Запуск SECTOR 04">
+    <picture class="startup-art">
+      <source media="(max-aspect-ratio: 4/5)" srcset="/art/brand/vk-story-1080x1920.jpg">
+      <img src="/art/brand/sector04-game-1920x1080.jpg" alt="SECTOR 04" width="1920" height="1080" fetchpriority="high">
+    </picture>
+    <div class="startup-footer">
+      <div class="startup-status" id="startupStatus" role="status">Загружаем игру…</div>
+      <a class="startup-retry" id="startupRetry" href="" hidden>Перезагрузить игру</a>
+      <noscript><p>Включи JavaScript и обнови страницу, чтобы запустить игру.</p></noscript>
+    </div>
+  </section>
+  <div class="shell" id="gameShell" inert>
+    <header class="header">
+      <a class="brand" href="/" aria-label="SECTOR 04, главная"><span class="brand-symbol" aria-hidden="true">04</span><span class="brand-name">SECTOR <b>04</b></span></a>
+      <nav class="main-nav" aria-label="Главное меню"><a href="#arenaPanel" aria-current="page">Арена</a><a href="#mapCatalog">Карты</a><button data-open-character>Персонаж</button><button data-open-shop>Арсенал</button></nav>
+      <button class="icon-btn" id="sound" title="Выключить звук" aria-label="Выключить звук">♫ <span>Звук вкл.</span></button>
+      <div class="profile"><div class="avatar">04</div><span id="profileName">Гость<small>НОВЫЙ БОЕЦ</small></span></div>
+      <div id="settingsMount"></div>
+      <button class="text-btn" id="logout">Выйти</button>
+    </header>
+    <main>
+      <div class="page-heading"><div><h1>Оперативный центр</h1><p>Выбери арену и режим игры.</p></div><div class="game-tools"><div id="historyMount"></div><button class="text-btn" id="help">Управление <span aria-hidden="true">↗</span></button></div></div>
+      <div class="layout">
+        <section class="map-selector" id="mapCatalog" aria-labelledby="mapCatalogTitle" tabindex="-1">
+          <div class="map-selector-heading"><h2 id="mapCatalogTitle">Каталог карт</h2><p id="cameraHint">Арена для следующего боя</p></div>
+          <div class="map-invitation" id="incomingInvite" hidden>
+            <p>Приглашение в комнату <strong id="incomingCode"></strong></p>
+            <button type="button" class="secondary" id="incomingJoin">Войти по приглашению</button>
+          </div>
+          <div class="map-modes" id="mapModes" role="group" aria-label="Режим онлайн-матча">
+            <button type="button" data-match-mode="ffa" aria-pressed="true">Каждый за себя</button>
+            <button type="button" data-match-mode="1v1" aria-label="Дуэль 1 на 1" aria-pressed="false">1 × 1</button>
+            <button type="button" data-match-mode="2v2" aria-label="Командный матч 2 на 2" aria-pressed="false">2 × 2</button>
+            <button type="button" data-match-mode="3v3" aria-label="Командный матч 3 на 3" aria-pressed="false">3 × 3</button>
+          </div>
+          <div class="map-choices" id="mapChoices" role="group" aria-label="Выбор арены"></div>
+          <div class="map-search" id="mapSearch">
+            <div class="map-search-actions">
+              <button type="button" class="primary" id="quick" aria-describedby="queueSelection">Найти матч <span aria-hidden="true">↗</span></button>
+              <button type="button" class="secondary" id="duelPrivate" aria-describedby="queueSelection" hidden>Создать дуэль по коду</button>
+            </div>
+            <div><strong id="queueSelection">Литейная · Каждый за себя</strong><p class="queue-hint" id="queueHint">До 10 секунд на подбор. Свободные места займут боты.</p></div>
+          </div>
+        </section>
+        <section class="arena-panel" id="arenaPanel" aria-label="Игровая арена">
+          <div class="arena-top"><span><span class="live-dot"></span> <b id="arenaTitle">ПОЛИГОН «ЛИТЕЙНАЯ»</b></span><div class="arena-actions"><span id="connection">ПРЕВЬЮ КАРТЫ</span><button class="icon-btn" id="fullscreen" title="На весь экран" aria-label="На весь экран">⛶</button></div></div>
+          <div class="viewport" id="viewport">
+            <canvas id="game" width="1440" height="810" tabindex="0" aria-label="Игровая арена. Клавиши показаны под ареной, мышь — прицел и огонь."></canvas><canvas id="actors3d" width="1440" height="810" aria-hidden="true"></canvas><canvas id="hudCanvas" width="1440" height="810" aria-hidden="true"></canvas>
+            <div id="connectionBanner" class="connection-banner" role="status" hidden>Связь прервалась. Восстанавливаем подключение…</div><div id="fpsCounter" class="fps-counter" hidden></div>
+            <div class="map-tag" id="mapTag"><span id="mapZone">01 / INDUSTRIAL ZONE</span><strong id="mapTitle">ЛИТЕЙНАЯ</strong><p id="mapDescription">Здесь решают реакция и высота.</p></div>
+            <div class="preview-label" id="previewLabel"><span class="cross" aria-hidden="true">●</span> ПРЕДПРОСМОТР</div>
+            <section id="queueOverlay" class="queue-overlay" aria-labelledby="queueTitle" hidden>
+              <div class="queue-panel">
+                <img class="queue-art" src="/art/brand/vk-community-cover-1920x768.jpg" alt="" width="1920" height="768" loading="lazy">
+                <div class="queue-content">
+                  <div class="queue-details">
+                    <h2 id="queueTitle">Поиск матча</h2>
+                    <p id="queueArena" class="queue-arena"></p>
+                    <p id="queueStatus" role="status" aria-atomic="true">Подключаемся к серверу…</p>
+                    <progress id="queueProgress" max="6" value="0" aria-label="Игроков в комнате" hidden></progress>
+                    <p id="duelCodeLabel" hidden>Код комнаты <strong id="duelCode"></strong></p>
+                  </div>
+                  <div class="queue-actions">
+                    <button id="queueInvite" class="secondary" type="button" hidden>Скопировать приглашение</button>
+                    <button id="queueCancel" class="secondary" type="button">Отменить поиск</button>
+                  </div>
+                  <input id="queueInviteUrl" class="invite-link" aria-label="Ссылка приглашения" readonly hidden>
+                </div>
+              </div>
+            </section>
+            <section id="battleIntro" class="battle-intro" data-phase="loading" aria-labelledby="battleIntroTitle" hidden>
+              <div class="battle-intro-card">
+                <div class="battle-intro-art" id="battleIntroArt" aria-hidden="true"></div>
+                <div class="battle-intro-copy">
+                  <p class="battle-intro-status" id="battleIntroStatus" role="status">Подключаемся к бою…</p>
+                  <p class="battle-intro-countdown" role="status" aria-atomic="true">
+                    <span>Начало боя через</span><strong id="battleIntroDigit"><span class="battle-countdown-number">3</span></strong>
+                  </p>
+                  <div class="battle-intro-heading">
+                    <h2 id="battleIntroTitle"></h2>
+                    <p id="battleIntroMode"></p>
+                  </div>
+                  <div class="battle-intro-tip"><span>Совет</span><p id="battleIntroTip"></p></div>
+                </div>
+              </div>
+            </section>
+            <p class="battle-start-notice" id="battleStartNotice" role="status" hidden>В БОЙ!</p>
+            <div class="match-hud" id="matchHud" hidden><span class="hud-mode" id="roomLabel"></span><strong id="timer">03:00</strong><span id="matchGoal">ЦЕЛЬ: 15</span></div>
+            <div class="player-hud" id="playerHud" hidden>
+              <div><span>ЗДОРОВЬЕ</span><strong id="health">100</strong><div class="health-track"><i id="healthBar"></i></div></div>
+              <div id="armorHud" role="meter" aria-label="Броня" aria-valuemin="0" aria-valuemax="50" aria-valuenow="0" hidden><span>БРОНЯ</span><strong id="armorAmount">0</strong><div class="health-track armor-track"><i id="armorBar"></i></div></div>
+              <div id="helmetHud" role="meter" aria-label="Защита головы" aria-valuemin="0" aria-valuemax="30" aria-valuenow="0" hidden><span>ШЛЕМ</span><strong id="helmetAmount">0</strong><div class="health-track helmet-track"><i id="helmetBar"></i></div></div>
+              <div><span id="weaponName">P-9</span><strong id="ammo">12 / 12</strong></div>
+              <div><span>ГРАНАТЫ</span><strong id="grenades">3</strong></div>
+              <div class="medkit-inventory"><span>АПТЕЧКИ</span><div class="medkit-slots"><button type="button" data-medkit="small" aria-label="Малая аптечка" title="Малая аптечка" disabled><kbd aria-hidden="true" data-keybind="medkitSmall">1</kbd><strong>0</strong></button><button type="button" data-medkit="large" aria-label="Большая аптечка" title="Большая аптечка" disabled><kbd aria-hidden="true" data-keybind="medkitLarge">2</kbd><strong>0</strong></button></div></div>
+              <div id="jetHud" hidden><span>ДЖЕТПАК · <span data-keybind="jet">Пробел</span></span><strong id="jetFuel">100%</strong><div class="health-track jet-track"><i id="jetFuelBar"></i></div><small id="jetHealHint" hidden>Пауза на лечение</small></div>
+              <div class="player-hud-feedback">
+                <div id="medkitIndicator" class="medkit-indicator" role="progressbar" aria-label="Применение аптечки" aria-describedby="medkitName medkitTime" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden>
+                  <div class="medkit-readout"><strong class="medkit-name" id="medkitName">Аптечка</strong><span class="medkit-time" id="medkitTime">0 с</span></div>
+                  <div class="medkit-track"><i id="medkitProgress"></i></div>
+                </div>
+                <ul class="pickup-buffs" id="buffHud" aria-label="Активные усиления" hidden>
+                  <li data-buff="speed" hidden><b>Ускорение</b><span></span></li>
+                  <li data-buff="critical" hidden><b>Крит ×2</b><span></span></li>
+                  <li data-buff="armor" hidden><b>Доп. броня</b><span></span></li>
+                  <li data-buff="transparent" hidden><b>Маскировка</b><span></span></li>
+                </ul>
+              </div>
+            </div>
+            <div class="killfeed" id="killfeed"></div>
+            <div class="death-message" id="deathMessage" hidden></div>
+            <button type="button" id="interactionButton" class="interaction-button" hidden><kbd id="interactionKey" data-keybind="interact" aria-hidden="true">E</kbd><span id="interactionText">Взаимодействовать</span></button>
+            <div id="grenadeAimHint" class="grenade-aim-hint" role="status" hidden>Отпусти Q — бросок</div><div id="reloadIndicator" class="reload-indicator" role="progressbar" aria-label="Перезарядка оружия" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div><strong>ПЕРЕЗАРЯДКА</strong><span id="reloadTime"></span></div><div class="reload-track"><i id="reloadProgress"></i></div></div>
+            <div class="touch-controls" id="touchControls" hidden><div><button data-control="left" aria-label="Влево">◀</button><button data-control="right" aria-label="Вправо">▶</button><button id="crouchButton" data-control="crouch" aria-label="Удерживать для приседа" aria-pressed="false" class="control-label">Сесть</button><button id="proneButton" data-control="prone" aria-label="Лечь или встать" aria-pressed="false" class="control-label">Лечь</button></div><div><button data-control="jump" aria-label="Прыжок">↑</button><button id="jetButton" data-control="jet" aria-label="Джетпак" hidden>✦</button><button data-control="fire" aria-label="Стрелять">◎</button><button data-control="reload" aria-label="Перезарядка" class="control-label">Перез.</button><button data-control="grenade" aria-label="Граната" class="control-label">Гран.</button><button id="weaponNext" type="button" data-control="weapon" aria-label="Следующее оружие" class="control-label" hidden>Оруж.</button></div></div>
+            <div class="result" id="result" hidden>
+              <div class="result-outro" id="resultOutro" role="status" hidden><h2>Бой окончен</h2></div>
+              <div class="result-summary" id="resultSummary" role="region" aria-labelledby="resultTitle" hidden>
+                <span class="eyebrow" id="resultOverline">МАТЧ ЗАВЕРШЁН</span>
+                <h2 id="resultTitle">Отличный бой.</h2>
+                <p id="resultText"></p>
+                <div class="result-stats">
+                  <div><strong id="resultKills">0</strong><span id="resultKillsLabel">Убийства</span></div>
+                  <div class="result-deaths"><strong id="resultDeaths">0</strong><span>Смерти</span></div>
+                  <div><strong id="resultDamage">0</strong><span id="resultDamageLabel">Урон</span></div>
+                </div>
+                <div class="result-rewards" role="group" aria-label="Награды за бой">
+                  <div><strong id="resultRating">+0 RP</strong><span>Рейтинг за бой</span></div>
+                  <div><strong id="resultCoins">+0 CR</strong><span>Кредиты за бой</span></div>
+                </div>
+                <div class="result-rank-progress" id="resultRankProgress" hidden>
+                  <div class="result-rank-labels"><span id="resultRankTarget"></span><strong id="resultRankRemaining"></strong></div>
+                  <progress id="resultRankMeter" max="100" value="0" aria-labelledby="resultRankTarget" aria-describedby="resultRankRemaining"></progress>
+                  <dl class="result-rank-unlocks" id="resultRankUnlocks" hidden>
+                    <div><dt>Бонус за звание</dt><dd id="resultRankBonus"></dd></div>
+                    <div class="result-rank-shop-row" id="resultRankShopRow" hidden>
+                      <dt>Откроется в арсенале</dt><dd class="result-rank-item-list" id="resultRankItems"></dd>
+                    </div>
+                  </dl>
+                </div>
+                <p id="resultBonus" class="result-bonus"></p>
+                <div class="result-promotion-slot" role="status" aria-atomic="true">
+                  <div class="result-promotion" id="resultPromotion" hidden>
+                    <span id="resultPromotionBadge" class="result-promotion-badge" aria-hidden="true"></span>
+                    <div class="result-promotion-copy"><span>Новое звание</span><strong id="resultPromotionName"></strong></div>
+                  </div>
+                </div>
+                <section class="result-new-items" id="resultNewItems" aria-labelledby="resultNewItemsTitle" hidden>
+                  <div class="result-new-items-heading">
+                    <h3 id="resultNewItemsTitle">Открыто с новым званием</h3>
+                    <span id="resultNewBalance"></span>
+                  </div>
+                  <ul class="result-new-item-list" id="resultNewItemList"></ul>
+                </section>
+                <button class="primary" id="again">Ещё один бой ↗</button>
+                <button class="text-btn" id="back">В лобби</button>
+              </div>
+            </div>
+          </div>
+          <div class="arena-bottom"><div><span class="map-icon">▧</span><span><strong id="activeMapName">Литейная</strong><small id="activeMapDetails">Промышленная арена</small></span></div><div class="map-facts"><span id="arenaCapacity">До 6 игроков</span><i></i><span>3 минуты</span><i></i><span id="arenaRules">Каждый за себя</span></div><div id="battleIntroDock" class="battle-intro-dock"></div></div>
+          <div class="controls-strip"><span><kbd data-keybind="left">A</kbd><kbd data-keybind="right">D</kbd> движение</span><span><kbd data-keybind="slide">Ctrl</kbd> + движение — подкат</span><span><kbd data-keybind="jump">W</kbd> прыжок</span><span><kbd data-keybind="crouch">S</kbd> присед</span><span><kbd data-keybind="prone">C</kbd> лечь / встать</span><span><kbd>ЛКМ</kbd> огонь</span><span><kbd data-keybind="reload">R</kbd> перезарядка</span><span><kbd data-keybind="grenade">Q</kbd> удерживать для гранаты</span><span><kbd data-keybind="jet">Пробел</kbd> полёт</span><span id="interactionHelp" hidden><kbd data-keybind="interact">E</kbd> дверь / лифт</span><span><kbd data-keybind="medkitSmall">1</kbd><kbd data-keybind="medkitLarge">2</kbd> аптечки</span><span><kbd>Колесо</kbd><kbd>3–9</kbd><kbd>0</kbd><kbd>−</kbd> оружие · Shift для первых двух слотов</span><span id="scoreHelp"><kbd data-keybind="score">Tab</kbd> счёт</span></div>
+        </section>
+        <aside class="sidebar" aria-label="Управление боем">
+          <section class="deploy-card" id="lobby">
+            <h2 class="deploy-title">Другие режимы</h2>
+            <input id="nickname" type="hidden" value="Войдите в игру">
+            <p class="queue-hint map-practice-hint" id="mapPracticeHint" hidden></p>
+            <div class="mode-buttons">
+              <button class="mode-button secondary" id="train" aria-label="Тренировка с ботами"><span class="mode-icon" aria-hidden="true">◎</span><span class="mode-copy"><strong>Тренировка с ботами</strong><small>Лёгкие противники и награды за фраги.</small></span><span class="mode-arrow" aria-hidden="true">›</span></button>
+              <button class="mode-button secondary" id="coop" aria-label="Экспедиция"><span class="mode-icon" aria-hidden="true">▱</span><span class="mode-copy"><strong>Экспедиция</strong><small>Три волны дронов для отряда до 3 игроков.</small></span><span class="mode-arrow" aria-hidden="true">›</span></button>
+              <button class="mode-button secondary" id="range" aria-label="Стрельбище"><span class="mode-icon" aria-hidden="true">⌖</span><span class="mode-copy"><strong>Стрельбище</strong><small>Мишени, свободный арсенал и подсказки.</small></span><span class="mode-arrow" aria-hidden="true">›</span></button>
+            </div>
+            <details class="loadout-menu"><summary>Снаряжение и внешность</summary>
+            <button class="secondary character-open" data-open-character>Выбрать внешность <span>→</span></button>
+            <div class="loadout-heading"><span class="field-label">ИНВЕНТАРЬ</span><button class="text-btn" data-open-shop>Арсенал ↗</button></div>
+            <p class="loadout-hint" id="inventoryHint">Стартовый пистолет P-9 · 3 гранаты в запасе</p>
+            <p class="loadout-hint">Стартовое оружие можно выбрать в арсенале. Меняй оружие колёсиком мыши над ареной или кнопкой «Оруж.» на телефоне.</p>
+            <p class="loadout-hint">Бронежилет и шлем устанавливаются автоматически. Шлем первым принимает попадания в голову. Защита восстанавливается при возрождении.</p>
+            </details>
+            <details class="friends-menu"><summary>Играть с друзьями</summary>
+            <div class="room-actions"><button class="secondary" id="create">Создать комнату</button><button class="secondary" id="joinToggle">Войти по коду ↗</button></div>
+            <form id="joinForm" hidden><input id="roomCode" aria-label="Код комнаты" placeholder="Код комнаты" pattern="[A-F0-9]{6}" autocomplete="off" autocapitalize="characters" spellcheck="false" required><button class="secondary" type="submit">Войти</button></form>
+            </details>
+            <div id="roomBrowser"></div>
+            <p class="error" id="error" role="status"></p>
+          </section>
+          <section class="session-card" id="session" hidden><div class="card-kicker">СЕССИЯ АКТИВНА <span class="terminal-dot">●</span></div><h2 id="sessionTitle">Бой начался.</h2><p class="muted" id="sessionDescription"></p><div id="roomDetails"><div class="room-code-label">КОД КОМНАТЫ</div><div class="room-code" id="activeCode"></div><button class="secondary" id="invite">Скопировать приглашение ↗</button></div><section id="coopTools" class="coop-tools" aria-label="Отряд экспедиции" hidden><div class="coop-team-heading"><strong>Отряд</strong><span id="coopCount">1 / 3</span></div><p class="coop-team" id="coopTeam"></p><p class="coop-status" id="coopStatus" role="status"></p><button class="primary" id="coopStart" hidden>Начать экспедицию <span>→</span></button></section><div id="rangeTools" class="range-tools" hidden><label for="rangeWeapon">Оружие</label><select id="rangeWeapon"></select><div class="range-stats"><div><span>Мишени</span><strong id="rangeHits">0</strong></div><div><span>Урон</span><strong id="rangeDamage">0</strong></div></div><div id="practiceGuide"></div></div><button class="secondary" id="sessionArmory" data-open-shop>Мой арсенал ↗</button><button class="secondary" id="leave">Выйти из боя</button><p class="muted">На телефоне прицел следует за ближайшим противником. На ПК используй мышь.</p></section>
+          <section class="economy-bar" aria-label="Прогресс бойца"><div class="rank-emblem">⌃</div><div class="rank-summary"><span>ЗВАНИЕ БОЙЦА</span><strong id="rankName">Новобранец</strong><div class="rank-track"><i id="rankProgress"></i></div><small id="nextRank">Загружаем профиль…</small></div><div class="economy-stat"><span>РЕЙТИНГ</span><strong id="ratingValue">0 <small>RP</small></strong></div><div class="economy-stat credits"><span>КРЕДИТЫ</span><strong id="coinsValue">— <small>CR</small></strong></div></section>
+          <section class="score-card" hidden><div class="card-kicker"><span id="scoreTitle">ТАБЛИЦА БОЯ</span></div><div id="scoreContent"></div></section>
+        </aside>
+      </div>
+    </main>
+    <footer><span>SECTOR 04</span><span>Компьютер и сенсорное управление</span></footer>
+  </div>
+  <dialog id="loginDialog" aria-labelledby="loginTitle">
+    <h2 id="loginTitle">Вход в SECTOR 04</h2>
+    <div class="auth-modes" role="group" aria-label="Действия с профилем">
+      <button type="button" data-auth-mode="login" aria-pressed="true">Вход</button>
+      <button type="button" data-auth-mode="register" aria-pressed="false">Регистрация</button>
+      <button type="button" data-auth-mode="activate" aria-pressed="false">Старый профиль</button>
+    </div>
+    <p id="loginHint">Введи логин и пароль своего бойца.</p>
+    <form id="loginForm" method="post">
+      <label for="loginInput" class="field-label">Логин</label>
+      <input id="loginInput" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="loginRules" required>
+      <small id="loginRules">3–18 букв, цифр, _ или -</small>
+      <div id="activationFields" hidden>
+        <label for="activationCode" class="field-label">Код активации</label>
+        <input id="activationCode" type="text" maxlength="128" autocomplete="off" autocapitalize="none" spellcheck="false" disabled>
+      </div>
+      <label for="loginPassword" class="field-label">Пароль</label>
+      <input id="loginPassword" name="password" type="password" maxlength="256" autocomplete="current-password" required>
+      <small id="passwordRules" hidden>От 15 до 128 символов.</small>
+      <div id="confirmationFields" hidden>
+        <label for="loginPasswordConfirm" class="field-label">Повтори пароль</label>
+        <input id="loginPasswordConfirm" type="password" maxlength="256" autocomplete="new-password" disabled>
+      </div>
+      <p id="loginError" class="error" role="alert"></p>
+      <button class="primary" id="loginSubmit" type="submit"><b id="loginSubmitLabel">Войти в игру</b><span aria-hidden="true">→</span></button>
+    </form>
+  </dialog>
+  <dialog id="appearanceDialog" aria-labelledby="appearanceTitle"><div class="shop-header"><div><span class="eyebrow">ВНЕШНОСТЬ БОЙЦА</span><h2 id="appearanceTitle">Персонаж</h2></div><button id="closeAppearance" class="icon-btn" aria-label="Закрыть выбор внешности">×</button></div><div class="appearance-layout"><section class="character-stage"><div class="preview-scene"><canvas id="characterPreview" width="420" height="300" aria-label="Предпросмотр анимации персонажа"></canvas><canvas id="preview3d" width="420" height="300" aria-hidden="true"></canvas></div><small id="modelMode"></small><strong id="appearanceName">Рейнджер</strong><div class="animation-buttons" aria-label="Предпросмотр анимаций"><button class="selected" data-animation="idle">Стойка</button><button data-animation="run">Вправо</button><button data-animation="left">Влево</button><button data-animation="back">Назад</button><button data-animation="jump">Прыжок</button><button data-animation="crouch">Присед</button><button data-animation="prone">Лечь</button><button data-animation="shoot">Стрельба</button><button type="button" data-animation="hit">Попадание</button><button type="button" data-animation="reload">Перезарядка</button><button data-animation="fly">Полёт</button><button type="button" id="previewSpawn" data-animation="spawn" hidden>Появление</button><button data-animation="death">Смерть</button></div><progress id="previewReload" class="preview-reload" max="1" value="0" aria-label="Прогресс перезарядки" hidden></progress><label class="model-turn-label">Повернуть 3D-модель<input id="modelTurn" type="range" min="-180" max="180" value="0" aria-label="Поворот 3D-модели"></label></section><section class="appearance-options"><span class="field-label">БАЗОВЫЕ ОБЛИКИ</span><div id="characterStyles" class="style-choices"></div><span class="field-label" id="fantasyStylesLabel">ФАНТАСТИЧЕСКИЕ ОБЛИКИ</span><div id="fantasyStyles" class="style-choices" role="group" aria-labelledby="fantasyStylesLabel"></div><span class="field-label">ЦВЕТ КОСТЮМА</span><div id="characterPalettes"></div><p class="muted">Сочетай облик с расцветкой и нашивкой. Внешность можно менять между боями.</p><p id="skinRequirement" class="skin-requirement" aria-live="polite"></p><button type="button" id="openSkinShop" class="secondary" hidden>Открыть облики в арсенале</button><p class="error" id="appearanceError" role="status"></p><button id="saveAppearance" class="primary">Сохранить внешность <span>✓</span></button></section></div></dialog>
+  <dialog id="helpDialog"><button class="close-dialog icon-btn" id="closeHelp" aria-label="Закрыть">×</button><div class="eyebrow">УПРАВЛЕНИЕ И ПРАВИЛА</div><h2>Управление и правила</h2><p>Ниже указаны клавиши по умолчанию. Их можно изменить в «Настройки» → «Клавиши».</p><p>A/D или стрелки — движение. Для подката нажми Ctrl вместе с клавишей движения на земле. Во время подката можно стрелять. W или ↑ — прыжок; повторное нажатие в воздухе — второй прыжок. В подземелье разрешён только один прыжок, выше первого яруса не пускает потолок.</p><p>Удерживай S, чтобы присесть. Нажми C, чтобы лечь, и ещё раз C, чтобы встать. В обеих позах можно двигаться и стрелять. Мышь — прицел. Левая кнопка — стрельба. Пустой магазин перезаряжается автоматически, R — перезарядка вручную. <strong>Q — удерживай для траектории, отпусти для броска. Пробел — полёт на купленном джетпаке.</strong> Топливо восстанавливается на земле, когда пробел отпущен. Стартовое оружие можно выбрать в арсенале. Меняй оружие колёсиком мыши над ареной. Клавиши 1 и 2 применяют малую и большую аптечки. Лечение занимает 2,5 и 4 секунды соответственно, замедляет движение и отключает джетпак. Shift+1 и Shift+2 выбирают первые два слота оружия. Клавиши 3–9, 0 и «−» выбирают остальные слоты. В бою список начинается с P-9 и продолжается в порядке покупки. На стрельбище порядок показан в боковой панели. Если на 0 или 9 назначено другое действие, оно имеет приоритет.</p><p>На телефоне используй экранные кнопки. Для подката дважды нажми кнопку движения в одном направлении. Прицел выбирает ближайшего врага, а кнопка «Оруж.» переключает на следующий ствол. TAB показывает таблицу результатов.</p><p>После поражения ты вернёшься через 2,5 секунды. Щит после возрождения действует 1,5 секунды. В режиме «Каждый за себя» побеждает первый, кто набрал 15 фрагов, или лидер по окончании 3 минут. В боях 2 × 2 и 3 × 3 цель команды — 15 фрагов. Союзники не получают урон друг от друга.</p><p>За убийство — +10 рейтинга и +75 кредитов, в том числе в режиме лёгких ботов. Новые звания приносят бонус. Для покупки оружия нужны рейтинг и кредиты. Оружие остаётся навсегда, гранаты расходуются при броске. Покупки доступны между боями.</p><p>Для начала выбери карту и нажми «Играть с ботами». «Стрельбище» позволяет опробовать снаряжение на неподвижных мишенях и пройти учебный маршрут. В «Экспедиции» один игрок или отряд до трёх человек проходит волны дронов. «Играть с друзьями» позволяет создать комнату или войти по коду.</p><p>Для онлайн-подбора выбери карту и режим. Отсчёт в 10 секунд начинается, когда первый игрок встаёт в очередь. Полный состав сразу начинает бой. По истечении 10 секунд свободные места займут боты.</p></dialog>
+  <dialog id="shopDialog" aria-labelledby="shopTitle"><div class="shop-header"><div><span class="eyebrow">SECTOR 04 / ОРУЖЕЙНЫЙ ТЕРМИНАЛ</span><h2 id="shopTitle">Арсенал</h2></div><button class="icon-btn" id="closeShop" aria-label="Закрыть магазин">×</button></div><div class="shop-layout"><aside class="shop-summary"><div class="card-kicker">ДОСЬЕ БОЙЦА <span class="terminal-dot">●</span></div><h3 id="shopRank">Новобранец</h3><div class="shop-balance"><span>КРЕДИТЫ</span><strong id="shopCoins">250 <small>CR</small></strong></div><div class="shop-metrics"><div><span>РЕЙТИНГ</span><strong id="shopRating">0 RP</strong></div><div><span>УБИЙСТВА</span><strong id="lifetimeKills">0</strong></div></div><div class="shop-rewards"><span>КАЖДОЕ УБИЙСТВО</span><strong>+10 RP <i>/</i> +75 CR</strong><small>В онлайне и тренировке с ботами.</small></div><p id="shopPlayingNote" class="muted">Покупки доступны между боями.</p><details class="rank-ladder"><summary>Звания и награды ↗</summary><div id="rankLadder"></div></details></aside><section class="shop-main"><nav class="shop-filters" aria-label="Категории магазина"><button class="active" data-category="all">Всё</button><button data-category="assault">Автоматы</button><button data-category="machinegun">Пулемёты</button><button data-category="pistol">Пистолеты</button><button data-category="special">Спецоружие</button><button data-category="launcher">Базуки</button><button data-category="grenade">Гранаты</button><button data-category="medkit">Аптечки</button><button data-category="equipment">Снаряжение</button><button data-category="cosmetic">Облики</button><button data-category="leaderboard">Рейтинг ↗</button></nav><p class="shop-notice" id="shopNotice" role="status"></p><div class="shop-grid" id="shopGrid"></div><div id="leaderboardPanel" hidden><div class="leaderboard-head"><span>БОЕЦ / ЗВАНИЕ</span><span>УБИЙСТВА / RP</span></div><div id="leaderboardRows"></div><p class="muted">Лучшие 20 бойцов этого сервера. Рейтинг начисляется за подтверждённые убийства.</p></div></section></div></dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>
