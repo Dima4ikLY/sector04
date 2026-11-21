@@ -417,15 +417,67 @@ export function drawMapCovers(ctx,map,{viewer=null,view=null}={}){
   }
 }
 
-export function buildScenery(map, {includePlatforms = true, atlas = null, backdrop = null} = {}) {
+function drawTidalTerrain(ctx,map){
+  const {water,jets,slope}=map.tidal;
+  gradient(ctx,0,0,map.width,map.height,[[0,'#142530'],[.64,'#24505a'],[1,'#10282f']]);
+  for(let x=160;x<map.width;x+=320){
+    ctx.fillStyle='#192e3870';
+    ctx.beginPath();ctx.moveTo(x-110,0);ctx.lineTo(x+100,0);
+    ctx.lineTo(x+36,330+(x%3)*66);ctx.closePath();ctx.fill();
+  }
+  rect(ctx,water.x,water.y,water.w,water.h,'#0d707d');
+  for(let y=water.y+32;y<water.y+water.h;y+=32)
+    line(ctx,water.x,y,water.x+water.w,y,'#69d8da27',2);
+  line(ctx,water.x,water.y,water.x+water.w,water.y,'#91e8e6',4);
+  for(const jet of jets){
+    rect(ctx,jet.x,jet.y,jet.w,jet.h,'#87edfa35');
+    for(let y=jet.y+24;y<jet.y+jet.h-10;y+=64){
+      const x=jet.x+jet.w/2;
+      line(ctx,x-14,y+10,x,y-6,'#98f8f5a0',3);
+      line(ctx,x,y-6,x+14,y+10,'#98f8f5a0',3);
+    }
+  }
+  for(const surface of [...map.solids,...map.platforms]){
+    const {x,y,w,h,kind}=surface;
+    rect(ctx,x,y,w,h,kind==='crate'?'#725e47':'#324955');
+    rect(ctx,x,y,w,4,kind==='crate'?'#e6b375':'#92b7b8');
+    if(kind!=='crate'&&h>40){
+      for(let row=y+40;row<y+h;row+=40)line(ctx,x,row,x+w,row,'#172c35',2);
+    }
+  }
+  ctx.beginPath();
+  for(const [index,[x,y]] of slope.vertices.entries())index?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  ctx.closePath();ctx.fillStyle='#46777c';ctx.fill();
+  const [[ax,ay],[bx,by]]=slope.vertices;
+  line(ctx,ax,ay,bx,by,'#a3d9d5',4);
+  line(ctx,960,686,2240,686,'#a588643b',3);
+}
+
+export function drawTidalBridge(ctx,map,health){
+  for(const segment of map.tidal.bridge){
+    const hp=health?.[segment.id]??segment.hp;
+    if(!hp)continue;
+    const {x,y,w,h}=segment;
+    rect(ctx,x+1,y,w-2,h,hp<30?'#875646':'#66533f');
+    rect(ctx,x+1,y,w-2,4,hp<30?'#ec9970':'#e8be87');
+    for(let plank=x+16;plank<x+w;plank+=16)line(ctx,plank,y+4,plank,y+h,'#242630',2);
+  }
+}
+
+export function buildScenery(map, {includePlatforms = true, atlas = null, backdrop = null, preview = false} = {}) {
   const canvas = document.createElement('canvas');
-  const scale = map.zoom ? 2 : map.width > 1800 ? 1.25 : 1.5;
+  const scale = map.tidal ? (preview ? 480/map.width : 1) : map.zoom ? 2 : map.width > 1800 ? 1.25 : 1.5;
   canvas.width = map.width * scale;
   canvas.height = Math.round(map.height * scale);
   canvas.worldScale = scale;
   const ctx = canvas.getContext('2d');
   const look = arenaLooks[map.theme] || arenaLooks.foundry;
   ctx.scale(scale,scale);
+  if(map.tidal){
+    drawTidalTerrain(ctx,map);
+    if(preview)drawTidalBridge(ctx,map);
+    return canvas;
+  }
   if(map.backdrop?.aligned&&backdrop){
     ctx.drawImage(backdrop,0,0,map.width,map.height);
     return canvas;

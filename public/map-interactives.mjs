@@ -18,11 +18,15 @@ export function mechanismRect(definition,state){
   return height>0?{x,y:definition.y,w,h:height}:null;
 }
 
-export function mapWithMechanisms(map,states){
-  if(!states?.length)return map;
+export function mapWithMechanisms(map,states,bridgeHealth){
+  if(!states?.length&&!map.tidal)return map;
   const platforms=[...map.platforms],solids=[...(map.solids??[])];
+  if(map.tidal){
+    platforms.push(...map.tidal.bridge.filter(section=>(bridgeHealth?.[section.id]??section.hp)>0));
+    solids.push(map.tidal.slope);
+  }
   for(const definition of map.mechanisms??[]){
-    const state=states.find(item=>item.id===definition.id);
+    const state=states?.find(item=>item.id===definition.id);
     if(!state)continue;
     const rect=mechanismRect(definition,state);
     if(!rect)continue;

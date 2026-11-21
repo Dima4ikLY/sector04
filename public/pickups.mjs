@@ -14,6 +14,10 @@ export const PICKUP_TYPES={
 
 // Each anchor is [kind, x, top of the supporting surface].
 const freeForAllAnchors={
+  'flooded-station':[
+    ['small',502,1088],['small',2760,1088],['large',1600,1472],
+    ['speed',808,704],['armor',1600,1152],['transparent',2650,576]
+  ],
   foundry:[
     ['small',175,530],['small',1265,760],['large',720,420],
     ['speed',475,600],['critical',720,760],['armor',940,600],['transparent',1220,530]
@@ -50,10 +54,6 @@ const freeForAllAnchors={
 
 // Team layouts have identical supplies on both flanks and contested items on the center line.
 const teamAnchors={
-  'flooded-station':{
-    flank:[['small',278,807],['speed',694,807]],
-    center:[['critical',429],['armor',807]]
-  },
   'night-foundry':{
     flank:[['small',245,714],['large',390,458],['speed',705,355],['transparent',575,246]],
     center:[['critical',201],['armor',714]]

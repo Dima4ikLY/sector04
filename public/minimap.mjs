@@ -45,6 +45,16 @@ export function drawMinimap(ctx,{map,physicalMap,players=[],viewX,viewY,viewWidt
   for(const surface of physicalMap.solids??[]){
     const x=snap(fieldX+surface.x*scaleX),y=snap(fieldY+surface.y*scaleY);
     ctx.fillStyle=map.solids?.includes(surface)?'#52728a':'#e3b77e';
+    if(surface.vertices){
+      ctx.beginPath();
+      for(const [index,[vx,vy]] of surface.vertices.entries()){
+        const px=fieldX+vx*scaleX,py=fieldY+vy*scaleY;
+        if(index===0)ctx.moveTo(px,py);
+        else ctx.lineTo(px,py);
+      }
+      ctx.closePath();ctx.fill();
+      continue;
+    }
     ctx.fillRect(x,y,Math.max(devicePixel,snap(surface.w*scaleX)),Math.max(devicePixel,snap(surface.h*scaleY)));
   }
   for(const surface of physicalMap.platforms){

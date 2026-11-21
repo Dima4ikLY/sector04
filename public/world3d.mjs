@@ -39,7 +39,7 @@ function slabGeometry(width,height,depth,worldX,worldY) {
 
 export function buildWorldModel(map) {
   const root = new THREE.Group();
-  if(map.backdrop?.aligned){
+  if(map.backdrop?.aligned||map.tidal){
     root.userData.mapId=map.id;
     return {root,updateMechanisms(){},dispose(){}};
   }

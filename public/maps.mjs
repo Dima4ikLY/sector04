@@ -1,3 +1,5 @@
+import {tidalStation} from './tidal-station.mjs';
+
 export const VIEW_W=1440,VIEW_H=810;
 const freeForAllMaps=[
   {id:'foundry',name:'Литейная',number:'01',zone:'INDUSTRIAL ZONE',width:1440,height:810,theme:'foundry',terrain:'Промышленная арена',description:'Компактная арена. Бой за высоту.',
@@ -432,44 +434,7 @@ const nightFoundry={
   ]
 };
 
-const floodedStation={
-  id:'flooded-station',name:'Затопленная станция',number:'20',zone:'LIMESTONE STATION',
-  width:1774,height:887,theme:'spillway',jumpSpeed:680,
-  terrain:'Подвесной мост, уступы и подводная арка',
-  description:'Перейдите пещеру по подвесному мосту или обойдите соперников под каменной аркой.',
-  backdrop:{file:'flooded-station.png',aligned:true},
-  modes:['ffa','1v1','2v2','3v3'],
-  // One-way surfaces follow the bridge planks and the upper rim of the arch.
-  platforms:[
-    {x:0,y:807,w:1774,h:36,kind:'floor'},
-    {x:39,y:577,w:185,h:20},{x:211,y:524,w:119,h:19},
-    {x:111,y:450,w:116,h:18},{x:0,y:398,w:138,h:18},
-    {x:85,y:356,w:123,h:18},{x:45,y:302,w:332,h:20},
-    {x:305,y:397,w:184,h:17},
-    {x:483,y:394,w:63,h:12},{x:545,y:409,w:65,h:12},
-    {x:609,y:419,w:65,h:12},{x:673,y:427,w:88,h:12},
-    {x:760,y:429,w:81,h:12},{x:840,y:423,w:65,h:12},
-    {x:904,y:411,w:65,h:12},{x:968,y:396,w:53,h:12},
-    {x:1020,y:386,w:281,h:20},
-    {x:908,y:591,w:177,h:19},{x:1340,y:563,w:421,h:20},
-    {x:1254,y:323,w:109,h:18},{x:1307,y:270,w:115,h:18},
-    {x:1071,y:199,w:228,h:20},{x:1378,y:239,w:341,h:18},
-    {x:530,y:653,w:82,h:15},{x:611,y:635,w:139,h:18},
-    {x:749,y:646,w:94,h:16},{x:842,y:664,w:109,h:16},
-    {x:950,y:671,w:148,h:16},{x:1097,y:664,w:129,h:16}
-  ],
-  solids:[{x:1440,y:522,w:73,h:41,kind:'crate'}],
-  spawns:[
-    {x:620,y:807},{x:1154,y:807},{x:263,y:302},
-    {x:1570,y:563},{x:391,y:397},{x:1205,y:386}
-  ],
-  teamSpawns:[
-    [{x:250,y:807},{x:285,y:302},{x:381,y:397}],
-    [{x:1524,y:807},{x:1570,y:563},{x:1249,y:386}]
-  ]
-};
-
-export const maps=[...freeForAllMaps,...teamMaps,nightFoundry,floodedStation];
+export const maps=[...freeForAllMaps,...teamMaps,nightFoundry,tidalStation];
 export const getMap=id=>maps.find(map=>map.id===id)||maps[0];
 export function getMapsForMode(mode='ffa'){
   return maps.filter(map=>map.modes?map.modes.includes(mode):(map.mode??'ffa')===mode);

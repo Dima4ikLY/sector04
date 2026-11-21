@@ -4,7 +4,7 @@ import {createArmory} from './shop.mjs';
 import {START_WEAPON,armorForEquipment,helmetForEquipment,ranks,rankIndex,rankUnlocks,rankUnlocksBetween} from './catalog.mjs';
 import {getMap,getMapsForMode} from './maps.mjs';
 import {AimCamera,sampleBlastShake} from './camera.mjs';
-import {buildScenery,drawMapMechanisms,drawMapCovers} from './scenery.mjs';
+import {buildScenery,drawMapMechanisms,drawMapCovers,drawTidalBridge} from './scenery.mjs';
 import {isConcealedFrom} from './covers.mjs';
 import {teamSpawnColors as teamColors,teamFightColors} from './map-detail.mjs';
 import {mapWithMechanisms,nearbyMechanism} from './map-interactives.mjs';
@@ -206,6 +206,8 @@ function syncMapLabels(mapId){
   const map=getMap(mapId);$('mapZone').textContent=`${map.number} / ${map.zone}`;$('mapTitle').textContent=map.name.toUpperCase();$('mapDescription').textContent=map.description;
   $('viewport').classList.toggle('dungeon-view',map.id==='dungeon');
   $('viewport').classList.toggle('match-active',!!session);
+  $('tidalDown').hidden=!map.tidal;
+  $('tidalControlsHint').hidden=!map.tidal;
   $('activeMapName').textContent=map.name;$('activeMapDetails').textContent=map.terrain;
   $('interactionHelp').hidden=!map.mechanisms?.length;
   const mode=session?.coop?'ЭКСПЕДИЦИЯ':session?.range?'СТРЕЛЬБИЩЕ':session?.training?'ТРЕНИРОВКА':session?'ОНЛАЙН':'ПОЛИГОН';
@@ -247,6 +249,7 @@ function createTeamThumbnail(map){
   return preview;
 }
 function createMapPreview(map){
+  if(map.tidal)return buildScenery(map,{preview:true});
   if(map.backdrop?.aligned){
     const image=new Image(480,240);
     image.src=`/art/backgrounds/${map.backdrop.file}`;
@@ -805,9 +808,14 @@ document.querySelectorAll('[data-control]:not([data-control="weapon"])').forEach
     touchKeys.delete(control);
   });
 });
+function arenaViewY(map,p){
+  const bottom=map.height-H/(map.zoom||1);
+  if(!map.tidal||!p)return bottom;
+  return Math.min(bottom,Math.max(0,p.y-H/(map.zoom||1)*.60));
+}
 function pointerAimAngle(p,map){
   const zoom=map.zoom||1;
-  return Math.atan2(mouse.y/zoom+map.height-H/zoom-(p.y-shotOriginHeight(p.stance)),mouse.x/zoom+camera.x-p.x);
+  return Math.atan2(mouse.y/zoom+arenaViewY(map,p)-(p.y-shotOriginHeight(p.stance)),mouse.x/zoom+camera.x-p.x);
 }
 function input(){
   const p=world.players.find(player=>player.id===session?.id),map=getMap(world.mapId);
@@ -824,7 +832,7 @@ function input(){
   const jet=active&&!p?.medkit&&(holding('jet')||touchKeys.has('jet'));
   const changeStance=active&&!jump&&!jet;
   return {left:active&&(holding('left')||touchKeys.has('left')),right:active&&(holding('right')||touchKeys.has('right')),
-    jump,jet,crouch:changeStance&&(holding('crouch')||touchKeys.has('crouch')),prone:changeStance&&proneRequested,
+    jump,jet,down:active&&(holding('crouch')||touchKeys.has('crouch')||touchKeys.has('down')),crouch:changeStance&&(holding('crouch')||touchKeys.has('crouch')),prone:changeStance&&proneRequested,
     fire:active&&(keys.has('Mouse0')||touchKeys.has('fire')),reload:active&&(holding('reload')||touchKeys.has('reload')),grenade:active&&grenadePending,
     interact:active?requestedInteraction:0,angle,weapon:session?.weapon,...(active&&medkitPending)};
 }
@@ -1335,10 +1343,10 @@ function render(t){
   const map=getMap(world.mapId),focus=scene.players.find(p=>p.id===session?.id)||(!session?scene.players[0]:null);
   updateMedkitProgress(focus);
   updateBuffHud(focus);
-  const physicalMap=mapWithMechanisms(map,scene.mechanisms);
+  const physicalMap=mapWithMechanisms(map,scene.mechanisms,scene.bridgeHealth);
   updateInteractionPrompt(map);
   const aimX=session&&!touch?mouse.x:W/2+Math.cos(focus?.angle??0)*W/2;
-  const zoom=map.zoom||1,baseY=map.height-H/zoom;
+  const zoom=map.zoom||1,baseY=arenaViewY(map,focus);
   const baseX=camera.update(focus,aimX,dt,map.width,zoom);
   // Shake all world layers together. Input and the minimap keep the base camera.
   const shake=session&&!world.ended&&!lost&&preferences.effects&&!reducedMotion.matches
@@ -1357,6 +1365,7 @@ function render(t){
   if(bg3D!==draw3D)bg=scenery(map);
   drawArenaBackdrop(map,viewX,viewY,baseX,baseY,zoom);
   ctx.save();ctx.scale(zoom,zoom);ctx.translate(-viewX,-viewY);
+  if(map.tidal)drawTidalBridge(ctx,map,scene.bridgeHealth);
   drawAtmosphere(map,t);
   if(!draw3D)drawMapMechanisms(ctx,map,scene.mechanisms);
   const spawnOpacity=new Map();

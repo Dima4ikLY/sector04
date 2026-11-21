@@ -1,3 +1,5 @@
+import {polygonContact} from './geometry.mjs';
+
 const radius=6;
 const audibleBounceSpeed=45;
 export const GRENADE_FUSE=1.6;
@@ -43,7 +45,7 @@ function bounceFromSolid(g,s,old,from,emit){
 }
 export function advanceGrenade(g,map,dt,emitBounce){
   const old=g.y,remaining=g.life-dt;
-  const from=emitBounce?{x:g.x,y:g.y}:null;
+  const from=emitBounce||map.tidal?{x:g.x,y:g.y}:null;
   g.life=remaining>1e-9?remaining:0;
   g.vy+=900*dt;g.x+=g.vx*dt;g.y+=g.vy*dt;
   if(g.x<radius){
@@ -55,13 +57,24 @@ export function advanceGrenade(g,map,dt,emitBounce){
   }
   for(const surface of map.platforms){
     const contact=surface.y-radius;
-    if(surface.kind==='lift'||g.vy<=0||old>surface.y||g.y<contact||g.x<=surface.x||g.x>=surface.x+surface.w)continue;
+    if(map.tidal||surface.kind==='lift'||g.vy<=0||old>surface.y||g.y<contact||g.x<=surface.x||g.x>=surface.x+surface.w)continue;
     reportBounce(g,from,'y',surface.y,surface,emitBounce);
     g.y=contact;g.vy*=-.45;g.vx*=.65;
     break;
   }
-  for(const s of map.platforms)if(s.kind==='lift')bounceFromSolid(g,s,old,from,emitBounce);
-  for(const s of map.solids||[])bounceFromSolid(g,s,old,from,emitBounce);
+  for(const s of map.platforms)if(map.tidal||s.kind==='lift')bounceFromSolid(g,s,old,from,emitBounce);
+  for(const s of map.solids||[]){
+    if(!s.vertices){bounceFromSolid(g,s,old,from,emitBounce);continue;}
+    const hit=polygonContact(from,g,s,radius,radius);
+    if(!hit)continue;
+    const inward=g.vx*hit.nx+g.vy*hit.ny;
+    if(inward>=0)continue;
+    g.x=hit.x+hit.nx*.01;g.y=hit.y+hit.ny*.01;
+    g.vx-=1.45*inward*hit.nx;g.vy-=1.45*inward*hit.ny;
+    if(emitBounce&&-inward>=audibleBounceSpeed){
+      emitBounce({x:g.x,y:g.y,surface:s,speed:-inward,fraction:hit.fraction});
+    }
+  }
   return g;
 }
 export function grenadeTrajectory(p,map,angle=p.angle||0){

@@ -143,7 +143,8 @@ export class SnapshotBuffer {
         ? {...state,openness:mix(old.openness,state.openness,alpha)}
         : {...state,y:mix(old.y,state.y,alpha)};
     });
-    const map=mapWithMechanisms(getMap(a.world.mapId),mechanisms);
+    const bridgeHealth=b.world.bridgeHealth;
+    const map=mapWithMechanisms(getMap(a.world.mapId),mechanisms,bridgeHealth);
     const bullets=[],impacted=new Set();
     for(const effect of b.world.effects||[]){
       if(effect.bulletId!==undefined&&occurred(effect.time,worldTime))impacted.add(effect.bulletId);
@@ -165,7 +166,7 @@ export class SnapshotBuffer {
     }
     const grenades=sampleGrenades(a.world,b.world,worldTime,alpha,map);
     const pickups=samplePickups(a,b,time);
-    return applyMotionCues({...a.world,players,bullets,grenades,mechanisms,pickups},worldTime,b.world);
+    return applyMotionCues({...a.world,players,bullets,grenades,mechanisms,bridgeHealth,pickups},worldTime,b.world);
   }
 }
 

@@ -2,7 +2,7 @@ import {getMap,VIEW_W,VIEW_H} from './maps.mjs';
 import {launchGrenade,advanceGrenade,GRENADE_EFFECT_DURATION} from './grenade.mjs';
 import {rankPlayers} from './combat.mjs';
 import {MEDKIT_LIMIT,medkits} from './catalog.mjs';
-import {hasLineOfSight,segmentHitsRect} from './geometry.mjs';
+import {hasLineOfSight,polygonContact,segmentHitsRect} from './geometry.mjs';
 import {advanceMechanisms,createMechanisms,mapWithMechanisms,nearbyMechanism,triggerMechanism} from './map-interactives.mjs';
 import {BUFF_SPAWN,getMapBuffSpawns,getMapPickups,PICKUP_NOTICE_DURATION,PICKUP_TYPES} from './pickups.mjs';
 import {teamBotInput} from './team-bots.mjs';
@@ -67,6 +67,7 @@ export function createWorld(mapId='foundry',{range=false,coop=false,teamSize=0,t
     .filter(pickup=>Object.hasOwn(medkits,pickup.kind))
     .map(placement=>({...placement,remaining:0}));
   const world={mapId:map.id,range,coop:mission,mechanisms:createMechanisms(map),pickups,time:Number.isFinite(timeSeconds)&&timeSeconds>0?timeSeconds:ROUND,players:[],bullets:[],grenades:[],effects:[],audioEvents:[],combatEvents:[],feed:[],ended:false,serial:0};
+  if(map.tidal)world.bridgeHealth=Object.fromEntries(map.tidal.bridge.map(section=>[section.id,section.hp]));
   if(!range)mapBuffs.set(world,{locations:getMapBuffSpawns(map),nextAt:ROUND-BUFF_SPAWN.initialDelay,active:null,previous:null});
   if(teamSize===1||teamSize===2||teamSize===3)world.teams={size:teamSize,scores:[0,0],winner:null};
   return world;
@@ -117,6 +118,7 @@ function spawnPosition(p,world){
     return {...spawns[(teammateSlot+p.deaths)%spawns.length],angle:p.team===0?0:Math.PI};
   }
   if(!world.range&&!world.coop)return map.spawns[(p.deaths+slot)%map.spawns.length];
+  if(map.tidal)return {x:world.range?80+slot*85:160+slot*56,y:1088,angle:p.target?Math.PI:0};
   // All arenas have a continuous floor. Targets stay in a clear lane near the player.
   const floor=map.platforms.find(platform=>platform.x===0&&platform.w===map.width);
   if(world.coop)return {x:map.width/2-145+slot*56,y:floor.y,angle:0};
@@ -127,6 +129,7 @@ function respawn(p,world) {
   const s=spawnPosition(p,world);
   Object.assign(p,{...s,vx:0,vy:0,hp:100,armor:p.maxArmor,helmet:p.maxHelmet,dead:0,jumps:0,ammo:weapons[p.weapon].mag,reload:0,shield:p.target?0:1.5,jetFuel:100,jetActive:false,jetLocked:false,gaitDistance:0,stance:'stand',stanceHeight:PLAYER_HEIGHT,grenades:p.inventoryManaged?p.grenades:3});
   p.spawnAt=world.time;
+  if(world.bridgeHealth)Object.assign(p,{stanceHeight:72,dropTime:0,waterLeap:false,onSlope:false,slopeSpeed:0});
   p.slide=0;
   p.slideDirection=0;
   delete p.slideAudio;
@@ -157,6 +160,7 @@ export function startMatch(world){
     world.players.some(player=>player.bot||(player.team!==0&&player.team!==1))||
     world.players[0].team===world.players[1].team))return false;
   for(const player of world.players)respawn(player,world);
+  if(world.bridgeHealth)for(const section of getMap(world.mapId).tidal.bridge)world.bridgeHealth[section.id]=section.hp;
   const buff=mapBuffs.get(world);
   if(buff){
     retireMapBuff(world,buff);
@@ -252,12 +256,12 @@ function updateCoop(world,dt){
     finishRound(world);
   }
 }
-function groundSupport(p,surfaces){
+function groundSupport(p,surfaces,width=stances[p.stance].halfWidth){
   if(p.jumps!==0||Math.abs(p.vy)>=1)return null;
-  const width=stances[p.stance].halfWidth;
-  return surfaces.find(s=>p.y===s.y&&p.x+width>s.x&&p.x-width<s.x+s.w);
+  return surfaces.find(s=>!s.vertices&&p.y===s.y&&p.x+width>s.x&&p.x-width<s.x+s.w);
 }
 function updateStance(p,input,map,solids,grounded,allowSlide=true){
+  const dimensions=stance=>map.tidal&&stance==='stand'?{...stances.stand,height:72,halfWidth:20}:stances[stance];
   const slideRequest=input.slide;
   if(slideRequest)input.slide=0;
   const startsSlide=allowSlide&&p.stance==='stand'&&!input.jump&&!input.jet&&(slideRequest===-1||slideRequest===1);
@@ -268,10 +272,13 @@ function updateStance(p,input,map,solids,grounded,allowSlide=true){
     else if(allowSlide&&(p.slide>0||startsSlide))desired='slide';
   }
   if(p.stance!==desired){
-    const {height,halfWidth}=stances[desired];
+    const {height,halfWidth}=dimensions(desired);
     const margin=halfWidth+3;
     const crossesEdge=p.x<margin||p.x>map.width-margin;
-    const overlapsSolid=solids.some(s=>p.x+halfWidth>s.x&&p.x-halfWidth<s.x+s.w&&p.y>s.y&&p.y-height<s.y+s.h);
+    const center={x:p.x,y:p.y-height/2};
+    const overlapsSolid=solids.some(s=>s.vertices
+      ?polygonContact(center,center,s,halfWidth,height/2)
+      :p.x+halfWidth>s.x&&p.x-halfWidth<s.x+s.w&&p.y>s.y&&p.y-height<s.y+s.h);
     if(!crossesEdge&&!overlapsSolid)p.stance=desired;
     else if(p.stance==='slide')p.stance='crouch';
   }
@@ -282,7 +289,7 @@ function updateStance(p,input,map,solids,grounded,allowSlide=true){
     p.slide=SLIDE_DURATION;
     p.slideDirection=slideRequest;
   }
-  const stance=stances[p.stance];
+  const stance=dimensions(p.stance);
   p.stanceHeight=stance.height;
   return stance;
 }
@@ -393,6 +400,7 @@ function updateFlight(world,map,p,surface,oldX,oldY,fallSpeed,dt,jumping=false){
 }
 
 function bulletSurfaceContact(surface,x,y,dx,dy){
+  if(surface.vertices)return polygonContact({x,y},{x:x+dx,y:y+dy},surface);
   // A collision has already been found. Locate the entry face along the segment.
   const faceX=dx>0?surface.x:surface.x+surface.w;
   const faceY=dy>0?surface.y:surface.y+surface.h;
@@ -458,6 +466,7 @@ function emitSurfaceHit(world,map,surface,{x,y,nx,ny},bullet,time){
   impact.shotId=shotId;
 }
 function fireWeapon(world,map,obstacles,player,gun,firedAt){
+  if(map.tidal)player.shield=0;
   player.cool=gun.delay*(player.bot?1.8:1);
   player.ammo--;
   const shot=audioEvent(world,'shot',player,player.weapon,firedAt);
@@ -467,6 +476,7 @@ function fireWeapon(world,map,obstacles,player,gun,firedAt){
   // Test the distance before the spawn point as well as the projectile's later flight.
   let obstruction=null;
   for(const surface of obstacles){
+    if(world.bridgeHealth?.[surface.id]===0)continue;
     if(!segmentHitsRect(from,origin,surface))continue;
     const contact=bulletSurfaceContact(surface,from.x,from.y,dx,dy);
     if(!obstruction||contact.fraction<obstruction.contact.fraction)obstruction={surface,contact};
@@ -475,6 +485,7 @@ function fireWeapon(world,map,obstacles,player,gun,firedAt){
   const critical=gun.projectile!=='rocket'&&player.buffs.critical>0;
   if(critical)player.buffs.critical=0;
   if(obstruction){
+    damageBridge(world,obstruction.surface,damage*(critical?2:1));
     const id=++world.serial;
     if(gun.projectile==='rocket'){
       const {x,y}=obstruction.contact;
@@ -560,6 +571,17 @@ function explode(world,obstacles,source,{owner,radius,power,time=world.time,weap
   const event=audioEvent(world,'explosion',source,weapon,time);
   world.effects.push({...event,type:'explosion',bulletId,life:GRENADE_EFFECT_DURATION+.05,color:'#ffb357'});
   const thrower=world.coop||world.teams?world.players.find(player=>player.id===owner):null;
+  if(world.bridgeHealth&&bulletId===undefined){
+    for(const section of obstacles){
+      if(!(world.bridgeHealth[section.id]>0))continue;
+      const x=clamp(source.x,section.x,section.x+section.w);
+      const y=clamp(source.y,section.y,section.y+section.h);
+      const distance=Math.hypot(x-source.x,y-source.y);
+      if(distance<radius&&hasLineOfSight(source,{x,y},obstacles.filter(s=>s!==section))){
+        damageBridge(world,section,Math.round(power*(1-distance/radius)));
+      }
+    }
+  }
   for(const player of world.players){
     if(!areOpponents(world,thrower,player))continue;
     const target={x:player.x,y:player.y-Math.min(24,player.stanceHeight/2)};
@@ -721,6 +743,40 @@ export function botInput(p,world,dt=1/60,map=mapWithMechanisms(getMap(world.mapI
   const burst=Math.sin(world.time*3+world.players.indexOf(p)*2)>.55;
   return {left:moving&&dx<0,right:moving&&dx>0,crouch,prone,interact,jump:hop||(!crouch&&!prone&&dy<-60&&Math.sin(world.time*2+p.x)>.9),fire:p.botReaction<=0&&Math.hypot(dx,dy)<(botSkill.range??620)&&clear&&!blocked&&burst&&t.shield<=0,angle:aim,reload:p.ammo===0};
 }
+function damageBridge(world,surface,amount){
+  if(world.bridgeHealth?.[surface.id]>0){
+    world.bridgeHealth[surface.id]=Math.max(0,world.bridgeHealth[surface.id]-amount);
+  }
+}
+
+function tidalMovement(p,input,map,shape,dt,jumpPressed){
+  const {tidal}=map;
+  const {height,halfWidth}=shape;
+  const {water,slope}=tidal;
+  const bodyY=p.y-height/2;
+  const inWater=p.x>=water.x&&p.x<water.x+water.w&&bodyY>=water.y&&bodyY<water.y+water.h&&
+    !map.solids.some(s=>!s.vertices&&p.x>s.x&&p.x<s.x+s.w&&bodyY>s.y&&bodyY<s.y+s.h);
+  if(!inWater||p.vy>=0)p.waterLeap=false;
+  const jet=tidal.jets.find(j=>p.x+halfWidth>j.x&&p.x-halfWidth<j.x+j.w&&p.y>j.y&&p.y-height<j.y+j.h);
+  if(jet){p.vy=jet.velocity;return true;}
+  if(inWater&&!p.waterLeap){
+    if(jumpPressed&&!input.down&&bodyY<water.y+tidal.surfaceBand){
+      p.waterLeap=true;p.vy=-map.jumpSpeed;p.jumps=1;
+    }else{
+      p.vx=((input.right?1:0)-(input.left?1:0))*tidal.swimSpeed;
+      const swimUp=input.jump||p.bot&&(p.x<960||p.x>2240);
+      p.vy=((input.down?1:0)-(swimUp?1:0))*tidal.swimSpeed;
+      return true;
+    }
+  }
+  if(p.onSlope&&!jumpPressed){
+    p.slopeSpeed=Math.min(slope.speedCap,(p.slopeSpeed+slope.acceleration*dt)*Math.exp(-slope.friction*dt));
+    p.vx=clamp(p.vx-p.slopeSpeed/Math.SQRT2,-slope.speedCap/Math.SQRT2,slope.speedCap/Math.SQRT2);
+    p.vy=-p.vx;
+  }else p.slopeSpeed=0;
+  return false;
+}
+
 export function step(world,dt) {
   if(world.ended||world.countdown||world.coop?.phase==='waiting'||world.match?.phase==='waiting')return;
   dt=Math.min(dt,1/30); world.time=Math.max(0,world.time-dt);
@@ -728,7 +784,10 @@ export function step(world,dt) {
   advanceMechanisms(layout,mechanisms,world.players,playerHalfWidth,dt,(kind,source,elapsed)=>{
     audioEvent(world,kind,source,undefined,world.time+dt-elapsed);
   });
-  const map=mapWithMechanisms(layout,mechanisms),platforms=map.platforms,solids=map.solids||[],obstacles=[...platforms,...solids];
+  const map=mapWithMechanisms(layout,mechanisms,world.bridgeHealth);
+  const platforms=map.platforms,obstacles=[...platforms,...(map.solids??[])];
+  const solids=map.tidal?map.solids.filter(s=>!s.vertices):(map.solids??[]);
+  const tidal=map.tidal,gravity=tidal?.gravity??playerGravity;
   const activated=mechanisms.length?new Set():null;
   world.audioEvents=world.audioEvents.filter(event=>event.time-world.time<.6);
   world.combatEvents=world.combatEvents.filter(event=>event.time-world.time<.8);
@@ -750,12 +809,12 @@ export function step(world,dt) {
         interactionPressed(p,p.input.interact);
         p.previous.interact=p.input.interact===true;
       }
-      p.vx*=Math.exp(-8*dt);p.vy+=playerGravity*dt;
+      p.vx*=Math.exp(-8*dt);p.vy+=gravity*dt;
       const oldX=p.x,oldY=p.y,fallSpeed=p.vy;
       let landingSurface=null;
       const margin=layout.solids?39:18;
       p.x=clamp(p.x+p.vx*dt,margin,map.width-margin);p.y+=p.vy*dt;
-      for(const s of obstacles)if(p.vy>=0&&oldY<=s.y&&p.y>=s.y&&p.x+15>s.x&&p.x-15<s.x+s.w){p.y=s.y;p.vy=0;landingSurface=s;break;}
+      for(const s of obstacles)if(!s.vertices&&p.vy>=0&&oldY<=s.y&&p.y>=s.y&&p.x+15>s.x&&p.x-15<s.x+s.w){p.y=s.y;p.vy=0;landingSurface=s;break;}
       updateDeathFall(world,map,p,landingSurface,oldX,oldY,fallSpeed,dt);
       updateFlight(world,map,p,landingSurface,oldX,oldY,fallSpeed,dt);
       p.dead-=dt;
@@ -791,22 +850,27 @@ export function step(world,dt) {
     if(reloadBefore>0){p.reload-=dt;if(p.reload<=0)p.ammo=gun.mag;}
     if((i.reload||p.ammo===0)&&p.ammo<gun.mag&&p.reload<=0){p.reload=gun.reload;audioEvent(world,'reload',p,p.weapon);}
     if(Number.isFinite(i.angle))p.angle=i.angle;
-    const support=groundSupport(p,obstacles);
+    const support=p.onSlope?tidal?.slope:groundSupport(p,obstacles,tidal&&p.stance==='stand'?20:undefined);
     if(support)spawnSettling.delete(p);
     const {height,halfWidth,speed}=updateStance(p,i,map,solids,!!support,!treating);
     const standing=p.stance==='stand';
     const sliding=p.stance==='slide';
     p.vx=sliding
       ? p.slideDirection*(slideEndSpeed+(slideStartSpeed-slideEndSpeed)*(p.slide/SLIDE_DURATION))
-      : ((i.right?1:0)-(i.left?1:0))*(p.bot?(world.match?.botSpeed??155):285)*speed*(treating?medkitSpeed:1)*
+      : ((i.right?1:0)-(i.left?1:0))*(p.bot?(world.match?.botSpeed??155):(tidal?.speed??285))*speed*(treating?medkitSpeed:1)*
         (p.buffs.speed>0?PICKUP_TYPES.speed.multiplier:1);
-    const jumping=!treating&&standing&&i.jump&&!p.previous.jump&&p.jumps<(map.maxJumps||2);
+    const jumpPressed=!treating&&i.jump&&!p.previous.jump;
+    if(tidal)p.dropTime=Math.max(0,p.dropTime-dt);
+    const dropping=tidal&&i.down&&jumpPressed&&platforms.includes(support);
+    if(dropping){p.dropTime=tidal.dropTime;p.jumps=1;}
+    const assisted=tidal&&tidalMovement(p,i,map,{height,halfWidth},dt,jumpPressed);
+    const jumping=!assisted&&!dropping&&standing&&jumpPressed&&!p.waterLeap&&p.jumps<(map.maxJumps||2);
     if(jumping){p.vy=-(map.jumpSpeed||590);p.jumps++;}
     if(!i.jet&&p.jetFuel>=20)p.jetLocked=false;
-    p.jetActive=!!(!treating&&standing&&p.hasJetpack&&i.jet&&p.jetFuel>0&&!p.jetLocked);
-    p.vy+=playerGravity*dt;
+    p.jetActive=!!(!assisted&&!treating&&standing&&p.hasJetpack&&i.jet&&p.jetFuel>0&&!p.jetLocked);
+    if(!assisted)p.vy+=gravity*dt;
     if(p.jetActive){p.vy=Math.max(-390,p.vy-2300*dt);p.jetFuel=Math.max(0,p.jetFuel-(p.jetTier===2?10:32)*dt);p.jumps=Math.max(1,p.jumps);if(p.jetFuel<=0)p.jetLocked=true;}
-    else if(p.hasJetpack&&!i.jet&&p.jumps===0&&Math.abs(p.vy-playerGravity*dt)<1)p.jetFuel=Math.min(100,p.jetFuel+40*dt);
+    else if(p.hasJetpack&&!i.jet&&p.jumps===0&&Math.abs(p.vy-gravity*dt)<1)p.jetFuel=Math.min(100,p.jetFuel+40*dt);
     const oldY=p.y,oldX=p.x,moveX=p.vx*dt,margin=halfWidth+3;
     p.x=clamp(p.x+moveX,margin,map.width-margin);
     for(const s of solids){
@@ -823,7 +887,22 @@ export function step(world,dt) {
       if(p.vy<0&&oldY-height>=bottom&&p.y-height<=bottom){p.y=bottom+height;p.vy=0;}
       else if(p.vy>=0&&oldY<=s.y&&p.y>=s.y){p.y=s.y;p.vy=0;p.jumps=0;landingSurface=s;}
     }
-    for(const s of platforms)if(p.vy>=0&&oldY<=s.y&&p.y>=s.y&&p.x+halfWidth>s.x&&p.x-halfWidth<s.x+s.w){p.y=s.y;p.vy=0;p.jumps=0;landingSurface=s;break;}
+    if(!p.dropTime){
+      for(const s of platforms)if(p.vy>=0&&oldY<=s.y&&p.y>=s.y&&p.x+halfWidth>s.x&&p.x-halfWidth<s.x+s.w){p.y=s.y;p.vy=0;p.jumps=0;landingSurface=s;break;}
+    }
+    if(tidal){
+      const from={x:oldX,y:oldY-height/2},to={x:p.x,y:p.y-height/2};
+      const hit=polygonContact(from,to,tidal.slope,halfWidth,height/2);
+      p.onSlope=!!hit&&hit.ny<-.5;
+      if(hit&&(hit.nx||hit.ny)){
+        const remainderX=to.x-hit.x,remainderY=to.y-hit.y;
+        const into=Math.min(0,remainderX*hit.nx+remainderY*hit.ny);
+        p.x=hit.x+remainderX-into*hit.nx+hit.nx*.001;
+        p.y=hit.y+remainderY-into*hit.ny+hit.ny*.001+height/2;
+        if(p.onSlope){p.jumps=0;landingSurface=tidal.slope;}
+        if(hit.ny>0&&p.vy<0)p.vy=0;
+      }
+    }
     if(jumping&&support&&p.y<oldY&&oldX+halfWidth>support.x&&oldX-halfWidth<support.x+support.w){
       surfaceAudio(world,map,'jump',p,support,oldX,world.time+dt);
     }
@@ -836,9 +915,10 @@ export function step(world,dt) {
     }
     if(sliding||p.slideAudio)updateSlideAudio(world,map,p,landingSurface);
     updateFootsteps(world,map,p,!wasAirborne&&oldY===p.y?landingSurface:null,oldX,moveX,dt);
-    if(p.y<PLAYER_HEIGHT){p.y=PLAYER_HEIGHT;p.vy=Math.max(0,p.vy);}
+    const ceiling=tidal?height:PLAYER_HEIGHT;
+    if(p.y<ceiling){p.y=ceiling;p.vy=Math.max(0,p.vy);}
     p.gaitDistance+=p.x-oldX;
-    if(p.y>H+80){
+    if(p.y>map.height+80){
       p.shield=0;
       p.armor=0;
       p.helmet=0;
@@ -883,22 +963,26 @@ export function step(world,dt) {
         b.life=0;
         break;
       }
-      const surface=obstacles.find(s=>b.x>=s.x&&b.x<=s.x+s.w&&b.y>=s.y&&b.y<=s.y+s.h);
+      const surface=obstacles.find(s=>world.bridgeHealth?.[s.id]!==0&&(s.vertices
+        ?segmentHitsRect({x:startX,y:startY},b,s)
+        :b.x>=s.x&&b.x<=s.x+s.w&&b.y>=s.y&&b.y<=s.y+s.h));
       if(surface){
         const contact=bulletSurfaceContact(surface,startX,startY,dx,dy);
         elapsed=flight*(k+contact.fraction)/n;
         const time=world.time+dt-elapsed;
+        damageBridge(world,surface,b.damage);
         if(rocket)explodeRocket(world,obstacles,b,contact.x,contact.y,time);
         else emitSurfaceHit(world,map,surface,contact,b,time);
         b.life=0;
         break;
       }
       // Foliage conceals a fighter from targeting, but never blocks a real projectile.
-      const hit=world.players.find(p=>p.id!==b.owner&&p.dead<=0&&areOpponents(world,shooter,p)&&Math.abs(b.x-p.x)<stances[p.stance].halfWidth+2&&b.y>p.y-p.stanceHeight&&b.y<p.y);
+      const bodyHalfWidth=p=>tidal&&p.stance==='stand'?20:stances[p.stance].halfWidth;
+      const hit=world.players.find(p=>p.id!==b.owner&&p.dead<=0&&areOpponents(world,shooter,p)&&Math.abs(b.x-p.x)<bodyHalfWidth(p)+2&&b.y>p.y-p.stanceHeight&&b.y<p.y);
       if(hit){
         if(rocket)explodeRocket(world,obstacles,b,b.x,b.y,world.time+dt-flight*(k+1)/n);
         else{
-          const halfWidth=stances[hit.stance].halfWidth+2;
+          const halfWidth=bodyHalfWidth(hit)+2;
           const hitbox={x:hit.x-halfWidth,y:hit.y-hit.stanceHeight,w:halfWidth*2,h:hit.stanceHeight};
           const {fraction}=bulletSurfaceContact(hitbox,startX,startY,dx,dy);
           elapsed=flight*(k+fraction)/n;
