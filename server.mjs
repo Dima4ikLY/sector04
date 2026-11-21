@@ -451,7 +451,7 @@ export function createArenaServer({
       Object.assign(files,{'/practice-guide.mjs':'practice-guide.mjs','/practice-guide.css':'practice-guide.css','/emblems.css':'emblems.css','/keybinds.mjs':'keybinds.mjs','/history.mjs':'history.mjs','/history.css':'history.css','/combat.mjs':'combat.mjs','/geometry.mjs':'geometry.mjs','/rooms.mjs':'rooms.mjs','/rooms.css':'rooms.css','/settings.mjs':'settings.mjs','/settings.css':'settings.css','/improvements.css':'improvements.css','/grenade.mjs':'grenade.mjs','/world3d.mjs':'world3d.mjs','/gait.mjs':'gait.mjs','/models3d.mjs':'models3d.mjs','/map-detail.mjs':'map-detail.mjs','/vendor/three.module.min.js':'vendor/three.module.min.js','/vendor/three.core.min.js':'vendor/three.core.min.js'});
       Object.assign(files,{'/operations.css':'operations.css','/operations-panels.css':'operations-panels.css','/actor-motion.mjs':'actor-motion.mjs','/death-motion.mjs':'death-motion.mjs','/arena-effects.mjs':'arena-effects.mjs',
         '/grenade-effects.mjs':'grenade-effects.mjs','/skin-effects.mjs':'skin-effects.mjs','/skin-transitions.mjs':'skin-transitions.mjs',
-        '/map-interactives.mjs':'map-interactives.mjs','/pickups.mjs':'pickups.mjs','/pickup-effects.mjs':'pickup-effects.mjs',
+        '/map-interactives.mjs':'map-interactives.mjs','/pickups.mjs':'pickups.mjs','/pickup-effects.mjs':'pickup-effects.mjs','/covers.mjs':'covers.mjs',
         '/hud-metrics.mjs':'hud-metrics.mjs','/minimap.mjs':'minimap.mjs',
         '/team-bots.mjs':'team-bots.mjs','/team-routes.mjs':'team-routes.mjs',
         '/art/arena-atlas.png':'art/arena-atlas.png','/audio/weapon-shots.wav':'audio/weapon-shots.wav',

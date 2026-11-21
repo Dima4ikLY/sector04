@@ -1,5 +1,6 @@
 import {arenaLooks,gradient,haze,lamp,line,mechanismAppearance,mechanismLights,pipe,platformDetails,rearDeckSupports,rect,rng,surfaceGrain,teamSpawnBeacon,teamSpawnColors} from './map-detail.mjs';
 import {VIEW_W} from './maps.mjs';
+import {getMapCovers} from './covers.mjs';
 
 const atlasPanels = {foundry: [0, 0], canyon: [1, 0], harbor: [0, 1], dungeon: [1, 1]};
 const photoFocusY={foundry:.54,canyon:.4,harbor:.72,dungeon:.38,spillway:.86,observatory:.48};
@@ -374,6 +375,31 @@ export function drawMapMechanisms(ctx,map,states=[]) {
   }
 }
 
+export function drawMapCovers(ctx,map){
+  for(const cover of getMapCovers(map)){
+    const baseY=cover.y;
+    // Trunk and shadow stay subtle, the foliage is what hides the fighter.
+    rect(ctx,cover.x+cover.w/2-6,baseY-52,12,52,'#3b2d1e');
+    rect(ctx,cover.x+8,baseY-6,cover.w-16,6,'#18201859');
+    for(let n=0;n<7;n++){
+      const cx=cover.x+18+n*(cover.w-36)/6;
+      const cy=baseY-70-((n%3)*16);
+      const radius=30-((n%2)*7);
+      ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);
+      ctx.fillStyle=n%2?'#2c5a35':'#35683d';
+      ctx.fill();
+    }
+    for(let n=0;n<4;n++){
+      const cx=cover.x+26+n*(cover.w-52)/3;
+      const cy=baseY-34-((n%2)*20);
+      const radius=22-(n%2)*5;
+      ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);
+      ctx.fillStyle='#40744a';
+      ctx.fill();
+    }
+  }
+}
+
 export function buildScenery(map, {includePlatforms = true, atlas = null, backdrop = null} = {}) {
   const canvas = document.createElement('canvas');
   const scale = map.zoom ? 2 : map.width > 1800 ? 1.25 : 1.5;
@@ -409,6 +435,7 @@ export function buildScenery(map, {includePlatforms = true, atlas = null, backdr
     });
     for (const s of map.platforms) platformDetails(ctx,s,map);
     for (const s of map.solids || []) platformDetails(ctx,s,map,true);
+    drawMapCovers(ctx,map);
   }
   return canvas;
 }
