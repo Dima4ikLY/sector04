@@ -102,7 +102,9 @@ function leastFilledTeam(world){
 
 function addArenaBot(world,team){
   const index=world.players.filter(player=>player.bot).length;
-  const bot=addPlayer(world,randomUUID(),botNames[index],true,START_WEAPON,{team});
+  const pool=Array.isArray(world.match?.weapons)&&world.match.weapons.length?world.match.weapons:[0,1,3,4,5,6,7,8,9,10];
+  const weapon=pool[index%pool.length];
+  const bot=addPlayer(world,randomUUID(),botNames[index],true,weapon,{team});
   bot.appearance={style:['scout','heavy','cyber'][index%3],palette:['sand','blue','red'][index%3]};
 }
 

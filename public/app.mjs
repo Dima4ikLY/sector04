@@ -1272,23 +1272,6 @@ function render(t){
     arenaSkinEffects.update(ambientPlayers,t);
     arenaSkinEffects.draw(ctx,view);
   }else arenaSkinEffects.reset();
-  if(world.teams){
-    for(const p of players){
-      if(p.dead>0)continue;
-      const ringColor=teamFightColors[p.team]??'#ffffff';
-      ctx.save();
-      ctx.globalAlpha=.85;
-      ctx.strokeStyle=ringColor;
-      ctx.lineWidth=2.2/zoom;
-      ctx.beginPath();
-      ctx.ellipse(p.x,p.y,17/1,4.6/1,0,0,Math.PI*2);
-      ctx.stroke();
-      ctx.globalAlpha=.35;
-      ctx.fillStyle=ringColor;
-      ctx.fill();
-      ctx.restore();
-    }
-  }
   const flatMuzzles=new Map();
   for(const p of players){
     const muzzle=drawCharacter(ctx,p,{time:t,me:p.id===session?.id,weapon:weapons[p.weapon],body:!draw3D,labels:false,effects:false,skinEffects,
