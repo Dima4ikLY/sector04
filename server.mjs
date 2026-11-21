@@ -294,7 +294,7 @@ export function createArenaServer({
           const coop=mode==='coop';
           const matchMode=b.matchMode===undefined?'ffa':b.matchMode;
           const privateMatch=mode==='create'&&matchMode==='1v1';
-          const matchConfig=mode==='quick'||privateMatch?matchModes.get(matchMode):undefined;
+          const matchConfig=mode==='quick'||mode==='create'?matchModes.get(matchMode):undefined;
           if(mode==='quick'&&!matchConfig)throw new EconomyError('Режим матча не найден',400);
           const now=performance.now();
           let room;
@@ -465,4 +465,5 @@ export function createArenaServer({
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const port=Number(process.env.PORT||4320);createArenaServer().listen(port,process.env.HOST||'0.0.0.0',()=>console.log(`SECTOR 04 → http://localhost:${port}`));
 }
+
 
