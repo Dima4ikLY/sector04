@@ -89,7 +89,7 @@ weaponLabels.forEach((label,index)=>{const id='room-weapon-'+index;const wrap=no
 const createSubmit=node('button','secondary','Создать');
 const cancelCreate=node('button','room-cancel','Отмена');
 optionsRow.append(modeSelect,mapSelect,fragsSelect,timeSelect,weaponsBox,createSubmit,cancelCreate);
-createForm.append(optionsRow);createForm.hidden=true;createButton.hidden=true;
+createForm.append(optionsRow);createForm.hidden=true;
 function syncCreateMaps(){mapSelect.replaceChildren(...getMapsForMode(modeSelect.value).map(map=>new Option(map.name,map.id)));}
 syncCreateMaps();
 modeSelect.addEventListener('change',syncCreateMaps);
@@ -108,5 +108,6 @@ createButton.addEventListener('click',()=>{createForm.hidden=false;createButton.
     destroy(){destroyed=true;cancel();details.removeEventListener('toggle',toggle);details.remove();}
   };
 }
+
 
 
