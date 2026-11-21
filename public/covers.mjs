@@ -1,5 +1,11 @@
 // Foliage conceals fighters, but is never a physical collider for shots.
 export const coverDefinitions={
+  'midnight-freight':[
+    {x:670,y:772,w:106,h:86},{x:986,y:772,w:120,h:92},{x:1460,y:772,w:116,h:84}
+  ],
+  'polar-station':[
+    {x:604,y:701,w:108,h:88},{x:1116,y:701,w:116,h:86},{x:1490,y:701,w:104,h:80}
+  ],
   foundry:[{x:290,y:760,w:120,h:96},{x:700,y:760,w:130,h:96},{x:1120,y:760,w:120,h:96}],
   'flooded-station':[
     {x:410,y:832,w:104,h:80},{x:3084,y:576,w:104,h:80},

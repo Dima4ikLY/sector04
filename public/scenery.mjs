@@ -379,6 +379,7 @@ export function drawMapMechanisms(ctx,map,states=[]) {
 const coverImages=new WeakMap();
 function drawFoliage(ctx,{x,y,w,h},seed){
     const random=rng(seed);
+    const palette=['#315c37','#407044','#294d31'];
     ctx.fillStyle='#101b16';
     ctx.beginPath();ctx.ellipse(x+w/2,y-2,w*.49,5,0,0,Math.PI*2);ctx.fill();
     rect(ctx,x+w*.46,y-h*.54,w*.08,h*.52,'#59442a');
@@ -388,7 +389,7 @@ function drawFoliage(ctx,{x,y,w,h},seed){
       for(let n=0;n<7;n++){
         const radiusX=w*(.095+random()*.025),radiusY=h*(.17+random()*.035);
         const cx=x+w*(.12+n*.125),cy=y-h*(.22+row*.25+random()*.06);
-        ctx.fillStyle=['#315c37','#407044','#294d31'][(n+row)%3];
+        ctx.fillStyle=palette[(n+row)%3];
         ctx.beginPath();ctx.ellipse(cx,cy,radiusX,radiusY,random()*.6-.3,0,Math.PI*2);ctx.fill();
         if((n+row)%2===0){
           line(ctx,cx-radiusX*.4,cy+radiusY*.25,cx+radiusX*.45,cy-radiusY*.3,'#86a86666',1.2);
@@ -396,11 +397,39 @@ function drawFoliage(ctx,{x,y,w,h},seed){
       }
     }
 }
-function coverImage(cover){
+function drawWeatherCover(ctx,{x,y,w,h},seed,style){
+  const snow=style==='snow',random=rng(seed);
+  const tint=snow?[158,183,219]:[107,139,153];
+  for(let i=0;i<15;i++){
+    const at=(i%5+random()*.32)/5;
+    const cx=x+w*(.18+at*.70);
+    const cy=y-h*(.12+Math.floor(i/5)*.24+random()*.12);
+    const rx=w*(snow?.29:.24),ry=h*(snow?.17:.27);
+    ctx.save();
+    ctx.translate(cx,cy);
+    ctx.scale(rx,ry);
+    const mist=ctx.createRadialGradient(0,0,0,0,0,1);
+    mist.addColorStop(0,`rgba(${tint.join(',')},.52)`);
+    mist.addColorStop(.52,`rgba(${tint.join(',')},.24)`);
+    mist.addColorStop(1,`rgba(${tint.join(',')},0)`);
+    ctx.fillStyle=mist;ctx.fillRect(-1,-1,2,2);
+    ctx.restore();
+  }
+  if(snow){
+    for(let i=0;i<30;i++){
+      const cx=x+w*(.08+random()*.83),cy=y-h*(.06+random()*.67);
+      line(ctx,cx,cy,cx+1+random()*5,cy-.4,'#d8eeff52',.85);
+    }
+  }
+}
+function coverImage(cover,style){
   if(coverImages.has(cover))return coverImages.get(cover);
   const canvas=document.createElement('canvas');
   canvas.width=Math.ceil(cover.w+8);canvas.height=Math.ceil(cover.h+10);
-  drawFoliage(canvas.getContext('2d'),{...cover,x:4,y:cover.h+4},Math.round(cover.x*97+cover.y*13+cover.w));
+  const ctx=canvas.getContext('2d'),bounds={...cover,x:4,y:cover.h+4};
+  const seed=Math.round(cover.x*97+cover.y*13+cover.w);
+  if(style==='steam'||style==='snow')drawWeatherCover(ctx,bounds,seed,style);
+  else drawFoliage(ctx,bounds,seed);
   coverImages.set(cover,canvas);
   return canvas;
 }
@@ -413,7 +442,7 @@ export function drawMapCovers(ctx,map,{viewer=null,view=null}={}){
     ctx.save();
     // Fade the whole bush once; overlapping leaves must not compound opacity.
     ctx.globalAlpha*=cover===ownCover ? .38 : .98;
-    ctx.drawImage(coverImage(cover),cover.x-4,cover.y-cover.h-4);
+    ctx.drawImage(coverImage(cover,map.coverArt),cover.x-4,cover.y-cover.h-4);
     ctx.restore();
   }
 }
@@ -520,7 +549,7 @@ export function drawTidalBridge(ctx,map,health){
 
 export function buildScenery(map, {includePlatforms = true, atlas = null, backdrop = null, preview = false} = {}) {
   const canvas = document.createElement('canvas');
-  const scale = map.tidal ? (preview ? 480/map.width : 1) : map.zoom ? 2 : map.width > 1800 ? 1.25 : 1.5;
+  const scale = map.tidal ? (preview ? 480/map.width : 1) : map.backdrop?.aligned&&backdrop ? 1 : map.zoom ? 2 : map.width > 1800 ? 1.25 : 1.5;
   canvas.width = map.width * scale;
   canvas.height = Math.round(map.height * scale);
   canvas.worldScale = scale;
@@ -535,6 +564,7 @@ export function buildScenery(map, {includePlatforms = true, atlas = null, backdr
   }
   if(map.backdrop?.aligned&&backdrop){
     ctx.drawImage(backdrop,0,0,map.width,map.height);
+    mechanismFixtures(ctx,map,look);
     return canvas;
   }
   gradient(ctx,0,0,map.width,map.height,look.sky.map((color,i) => [i/2,color]));

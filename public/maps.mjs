@@ -434,7 +434,59 @@ const nightFoundry={
   ]
 };
 
-export const maps=[...freeForAllMaps,...teamMaps,nightFoundry,tidalStation];
+const midnightFreight={
+  id:'midnight-freight',name:'Ночной грузовой вокзал',number:'21',zone:'MIDNIGHT FREIGHT',
+  width:1774,height:887,theme:'harbor',weather:'rain',coverArt:'steam',jumpSpeed:680,
+  terrain:'Вагоны, боковые галереи и два автоподъёмника',
+  description:'Подъёмники ходят в противофазе. На галереях открывается обзор, внизу среди пара проще уйти из виду.',
+  backdrop:{file:'midnight-freight.png',aligned:true},
+  modes:['ffa','1v1','2v2','3v3'],
+  platforms:[
+    {x:0,y:772,w:1774,h:48,kind:'floor'},
+    {x:214,y:398,w:394,h:25},{x:1260,y:398,w:451,h:25},
+    {x:214,y:493,w:230,h:18},{x:1372,y:494,w:248,h:18}
+  ],
+  mechanisms:[
+    {id:'freight-west-loader',type:'lift',name:'Западный грузовой подъёмник',x:470,w:120,h:18,top:398,bottom:772,speed:150,autoCycle:1.5},
+    {id:'freight-east-loader',type:'lift',name:'Восточный грузовой подъёмник',x:1264,w:106,h:18,top:398,bottom:772,speed:150,autoCycle:1.5,startAtTop:true}
+  ],
+  spawns:[
+    {x:93,y:772},{x:1682,y:772},{x:320,y:493},
+    {x:1502,y:494},{x:340,y:398},{x:1495,y:398}
+  ],
+  teamSpawns:[
+    [{x:93,y:772},{x:320,y:493},{x:340,y:398}],
+    [{x:1682,y:772},{x:1502,y:494},{x:1495,y:398}]
+  ]
+};
+
+const polarStation={
+  id:'polar-station',name:'Полярная станция',number:'22',zone:'POLAR STATION',
+  width:1774,height:887,theme:'observatory',weather:'snow',coverArt:'snow',jumpSpeed:650,
+  terrain:'Две галереи, лифт и управляемый затвор',
+  description:'Управляй затвором под галереей, поднимайся на лифте и используй снежную пыль, чтобы уйти из виду.',
+  backdrop:{file:'polar-station.png',aligned:true},
+  modes:['ffa','1v1','2v2','3v3'],
+  platforms:[
+    {x:0,y:701,w:1774,h:54,kind:'floor'},
+    {x:280,y:411,w:554,h:31},{x:996,y:411,w:465,h:31},
+    {x:1540,y:426,w:234,h:20}
+  ],
+  mechanisms:[
+    {id:'polar-main-lift',type:'lift',name:'Подъёмник станции',x:844,w:142,h:18,top:411,bottom:701,speed:128},
+    {id:'polar-passage-gate',type:'door',name:'Затвор нижнего прохода',x:1008,y:442,w:36,h:259,initiallyOpen:true}
+  ],
+  spawns:[
+    {x:90,y:701},{x:1680,y:701},{x:638,y:411},
+    {x:1185,y:411},{x:285,y:701},{x:1510,y:701}
+  ],
+  teamSpawns:[
+    [{x:90,y:701},{x:370,y:411},{x:285,y:701}],
+    [{x:1680,y:701},{x:1380,y:411},{x:1510,y:701}]
+  ]
+};
+
+export const maps=[...freeForAllMaps,...teamMaps,nightFoundry,tidalStation,midnightFreight,polarStation];
 export const getMap=id=>maps.find(map=>map.id===id)||maps[0];
 export function getMapsForMode(mode='ffa'){
   return maps.filter(map=>map.modes?map.modes.includes(mode):(map.mode??'ffa')===mode);

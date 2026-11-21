@@ -2,10 +2,16 @@ const doorRate=2.6;
 const contactTolerance=.01;
 const approach=(value,target,delta)=>value<target?Math.min(target,value+delta):Math.max(target,value-delta);
 const distanceToSpan=(value,low,high)=>Math.max(low-value,value-high,0);
+const cyclesAutomatically=definition=>Number.isFinite(definition.autoCycle)&&definition.autoCycle>0;
 
 export function createMechanisms(map){
-  return (map.mechanisms??[]).map(({id,type,initiallyOpen,bottom})=>{
-    if(type==='lift')return {id,type,y:bottom,target:bottom,direction:0};
+  return (map.mechanisms??[]).map(definition=>{
+    const {id,type,initiallyOpen,top,bottom,autoCycle,startAtTop}=definition;
+    if(type==='lift'){
+      const automatic=cyclesAutomatically(definition);
+      const y=automatic&&startAtTop?top:bottom;
+      return {id,type,y,target:y,direction:0,...(automatic?{dwell:autoCycle}:{})};
+    }
     const openness=initiallyOpen?1:0;
     return {id,type,openness,target:openness,direction:0};
   });
@@ -41,6 +47,7 @@ export function nearbyMechanism(map,states,player){
   if(!player||player.dead>0)return null;
   let nearest=null,bestDistance=Infinity;
   for(const definition of map.mechanisms??[]){
+    if(definition.type==='lift'&&cyclesAutomatically(definition))continue;
     const state=states?.find(item=>item.id===definition.id);
     if(!state)continue;
     const dx=distanceToSpan(player.x,definition.x,definition.x+definition.w);
@@ -76,7 +83,7 @@ export function triggerMechanism({definition,state},player,players,halfWidth){
     state.target=1-state.target;
     return true;
   }
-  if(state.y!==state.target)return false;
+  if(cyclesAutomatically(definition)||state.y!==state.target)return false;
   const {top,bottom}=definition;
   const landing=Math.abs(player.y-top)<Math.abs(player.y-bottom)?top:bottom;
   state.target=state.y===landing?(landing===top?bottom:top):landing;
@@ -105,7 +112,16 @@ export function advanceMechanisms(map,states,players,halfWidth,dt,emit){
       state.direction=next===state.target?0:direction;
       continue;
     }
-    const nextY=approach(state.y,state.target,definition.speed*dt);
+    const automatic=cyclesAutomatically(definition);
+    let travelTime=dt;
+    if(automatic&&state.y===state.target){
+      const wait=state.dwell??definition.autoCycle;
+      state.dwell=Math.max(0,wait-dt);
+      if(state.dwell>0)continue;
+      state.target=state.y===definition.top?definition.bottom:definition.top;
+      travelTime=Math.max(0,dt-wait);
+    }
+    const nextY=approach(state.y,state.target,definition.speed*travelTime);
     const direction=Math.sign(nextY-state.y);
     if(!direction)continue;
     const riders=players.filter(player=>{
@@ -118,7 +134,10 @@ export function advanceMechanisms(map,states,players,halfWidth,dt,emit){
     const arrivalTime=Math.abs(nextY-state.y)/definition.speed;
     state.y=nextY;
     state.direction=nextY===state.target?0:direction;
-    if(!state.direction)emitMotion(emit,definition,'lift-stop',nextY+definition.h/2,arrivalTime);
+    if(!state.direction){
+      if(automatic)state.dwell=Math.max(0,definition.autoCycle-(travelTime-arrivalTime));
+      emitMotion(emit,definition,'lift-stop',nextY+definition.h/2,arrivalTime);
+    }
     for(const rider of riders){rider.y=nextY;rider.vy=0;rider.jumps=0;}
   }
 }

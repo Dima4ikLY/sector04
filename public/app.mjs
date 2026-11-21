@@ -1267,7 +1267,8 @@ function drawArenaBackdrop(map,viewX,viewY,baseX,baseY,zoom){
 }
 function drawAtmosphere(map,time){
   if(!preferences.effects||reducedMotion.matches)return;
-  const rain=map.id==='harbor',snow=map.id==='observatory';
+  const rain=map.weather==='rain'||map.id==='harbor';
+  const snow=map.weather==='snow'||map.id==='observatory';
   const count=rain?40:snow?42:map.id==='dungeon'?14:30;
   const speed=rain?.46:map.id==='canyon'?.067:.023;
   const fall=rain?.8:snow?.11:.021;
@@ -1405,7 +1406,7 @@ function render(t){
     drawTidalBridge(ctx,map,scene.bridgeHealth);
   }
   drawAtmosphere(map,t);
-  if(!draw3D)drawMapMechanisms(ctx,map,scene.mechanisms);
+  if(!draw3D||map.backdrop?.aligned)drawMapMechanisms(ctx,map,scene.mechanisms);
   const spawnOpacity=new Map();
   if(skinEffects){
     const ambientPlayers=[];
