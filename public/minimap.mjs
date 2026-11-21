@@ -7,21 +7,25 @@ function fitName(ctx,name,width){
   return '';
 }
 
-export function drawMinimap(ctx,{map,physicalMap,players=[],viewX,viewY,viewWidth,viewHeight,focus,width,height,unit=1,pixel=unit,touch=false}){
-  if(map.width<=width)return;
+export function drawMinimap(ctx,{map,physicalMap,players=[],viewX,viewY,viewWidth,viewHeight,focus,width,height,unit=1,pixel=unit,touch=null,coop=false}){
+  if(map.width<=viewWidth&&map.height<=viewHeight)return;
   const devicePixel=pixel/unit;
   const snap=value=>Math.round(value/devicePixel)*devicePixel;
   const cssWidth=width/unit,cssHeight=height/unit;
   const compact=cssWidth<480;
-  const margin=compact?8:14;
-  const panelWidth=snap(Math.min(cssWidth-2*margin,Math.max(132,Math.min(206,cssWidth*.24))));
+  const margin=touch?7:compact?8:14;
+  const targetWidth=touch?Math.max(96,Math.min(136,cssWidth*.29)):Math.max(132,Math.min(206,cssWidth*.24));
+  const panelWidth=snap(Math.min(cssWidth-2*margin,targetWidth));
   if(panelWidth<62)return;
   const panelX=snap(cssWidth-margin-panelWidth);
-  const padding=compact?7:9,header=compact?23:26;
+  const padding=touch?4:compact?7:9,header=touch?padding:compact?23:26;
   const fieldWidth=snap(panelWidth-2*padding);
-  const fieldHeight=snap(compact?28:36);
+  const fieldHeight=snap(touch?(compact?32:38):compact?28:36);
   const panelHeight=header+fieldHeight+padding;
-  const panelY=snap(Math.max(margin,cssHeight-(touch?(compact?52:64):16)-panelHeight));
+  const aboveControls=touch==='landscape';
+  const panelY=snap(Math.max(margin,aboveControls
+    ?Math.min(42,cssHeight-margin-panelHeight)
+    :cssHeight-(touch?margin:16)-panelHeight));
   const fieldX=snap(panelX+padding),fieldY=snap(panelY+header);
   const scaleX=fieldWidth/map.width,scaleY=fieldHeight/map.height;
 
@@ -31,13 +35,15 @@ export function drawMinimap(ctx,{map,physicalMap,players=[],viewX,viewY,viewWidt
   ctx.fillStyle='#101923f5';ctx.fill();
   ctx.strokeStyle='#64778a';ctx.lineWidth=devicePixel;ctx.stroke();
 
-  ctx.textBaseline='alphabetic';ctx.textAlign='right';
-  ctx.font=`600 ${compact?10:11}px Consolas,monospace`;
-  const titleBaseline=snap(panelY+(compact?16:18));
-  ctx.fillStyle='#c9d7e4';ctx.fillText(`${Math.round(viewX)} м`,fieldX+fieldWidth,titleBaseline);
-  const distanceWidth=ctx.measureText(`${Math.ceil(map.width)} м`).width;
-  ctx.textAlign='left';ctx.font=`700 ${compact?11:12}px system-ui,sans-serif`;
-  ctx.fillStyle='#f4f8fc';ctx.fillText(fitName(ctx,map.name,fieldWidth-distanceWidth-7),fieldX,titleBaseline);
+  if(!touch){
+    ctx.textBaseline='alphabetic';ctx.textAlign='right';
+    ctx.font=`600 ${compact?10:11}px Consolas,monospace`;
+    const titleBaseline=snap(panelY+(compact?16:18));
+    ctx.fillStyle='#c9d7e4';ctx.fillText(`${Math.round(viewX)} м`,fieldX+fieldWidth,titleBaseline);
+    const distanceWidth=ctx.measureText(`${Math.ceil(map.width)} м`).width;
+    ctx.textAlign='left';ctx.font=`700 ${compact?11:12}px system-ui,sans-serif`;
+    ctx.fillStyle='#f4f8fc';ctx.fillText(fitName(ctx,map.name,fieldWidth-distanceWidth-7),fieldX,titleBaseline);
+  }
 
   ctx.fillStyle='#0a1019';ctx.fillRect(fieldX,fieldY,fieldWidth,fieldHeight);
   ctx.beginPath();ctx.rect(fieldX,fieldY,fieldWidth,fieldHeight);ctx.clip();
@@ -76,14 +82,15 @@ export function drawMinimap(ctx,{map,physicalMap,players=[],viewX,viewY,viewWidt
     ctx.fillStyle=color;ctx.fillText(portal.pair??'·',x,y);
   }
   for(const p of players){
-    if(!p||p.dead>0)continue;
+    if(!p||p.dead>0||p.id===focus?.id)continue;
     const dotX=Math.max(fieldX+2,Math.min(fieldX+fieldWidth-2,fieldX+p.x*scaleX));
     const dotY=Math.max(fieldY+2,Math.min(fieldY+fieldHeight-2,fieldY+p.y*scaleY));
     ctx.beginPath();ctx.arc(dotX,dotY,2.4,0,Math.PI*2);
-    ctx.fillStyle=p.id===(focus&&focus.id)?'#ffd76b':(focus&&p.team===focus.team?'#ffe9a8':(p.team===0?'#3fd0ff':'#ff7a2e'));
+    const ally=focus&&(Number.isInteger(focus.team)&&p.team===focus.team||coop&&!p.bot);
+    ctx.fillStyle=ally?'#71dfff':'#ff8d5a';
     ctx.fill();
   }
-  if(focus){
+  if(focus&&!(focus.dead>0)){
     const x=Math.max(fieldX+3,Math.min(fieldX+fieldWidth-3,fieldX+focus.x*scaleX));
     const y=Math.max(fieldY+3,Math.min(fieldY+fieldHeight-3,fieldY+focus.y*scaleY));
     ctx.beginPath();ctx.arc(x,y,3.5,0,Math.PI*2);ctx.fillStyle='#131c27';ctx.fill();

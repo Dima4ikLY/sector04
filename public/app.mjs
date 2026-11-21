@@ -31,8 +31,11 @@ import {measureHud} from './hud-metrics.mjs';
 import {drawMinimap} from './minimap.mjs';
 import {pickBattleTip} from './battle-tips.mjs';
 import {advanceBattleCue,BATTLE_START_NOTICE_MS} from './battle-cues.mjs';
+import {createTouchPresses,nearestVisibleAimPoint,sampleJoystick} from './touch-input.mjs';
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');
 const hudCanvas=$('hudCanvas'),hud=hudCanvas.getContext('2d');
+const battleSurface=$('battleSurface');
+const arenaExpanded=()=>!!document.fullscreenElement||battleSurface.hasAttribute('data-expanded');
 let arenaBounds=null,displaySize=null,displayDensity=0;
 new ResizeObserver(([entry])=>{arenaBounds=entry.contentRect;displaySize=null;}).observe(hudCanvas);
 const matchNames={ffa:'Онлайн-матч','1v1':'Дуэль 1×1','2v2':'Командный 2×2','3v3':'Командный 3×3'};
@@ -54,7 +57,10 @@ let resultRevealTimer=null;
 let resultFinishCuePending=false,resultRewardCount=null;
 const matchCapacities={ffa:6,'1v1':2,'2v2':4,'3v3':6};
 const teamNames=['Синие','Оранжевые'];
-let world=createWorld(),session=null,stream=null,joining=false,mouse={x:W*.7,y:H*.5},last=performance.now(),lastState=0,touch=matchMedia('(pointer:coarse), (max-width:650px)').matches;
+const touchMedia=matchMedia('(any-pointer: coarse), (max-width: 650px), (max-width: 950px) and (max-height: 480px) and (orientation: landscape)');
+let world=createWorld(),session=null,stream=null,joining=false,mouse={x:W*.7,y:H*.5},last=performance.now(),lastState=0,touch=touchMedia.matches;
+let mouseAim=false;
+const usesTouchAim=()=>touch&&!mouseAim;
 let inputPending=false,toastTimer,progressWarning=false,selectedMatchMode='ffa',selectedMap=getMapsForMode()[0].id,bg=null,grenadePending=false,bg3D=false,stalled=false,fpsTime=null,fpsFrames=0,leaving=null,touchJoystick;
 let preferences=readSettings();
 const shouldDrawArena=createFrameLimiter();
@@ -66,6 +72,7 @@ const battleScore=new BattleScore();
 let actors3D=preferences.renderer==='3d'?createCharacterScene($('actors3d'),{report:true}):null;
 const feedback=new CombatFeedback();
 const keys=new Set(),touchKeys=new Set();
+const touchPresses=createTouchPresses();
 const slideGesture=createSlideGesture();
 const visualActors=new Map();
 const shotMuzzles=new Map();
@@ -92,7 +99,7 @@ function syncBattleMusicVolume(){
 }
 function applySettings(value){
   const bindingChanged=Object.keys(value.bindings).some(action=>preferences.bindings[action]!==value.bindings[action]);
-  if(bindingChanged)clearControls();
+  if(bindingChanged||value.touchLayout!==preferences.touchLayout)clearControls();
   if(value.fpsLimit!==preferences.fpsLimit){fpsTime=null;fpsFrames=0;}
   preferences=value;
   audio.setVolume(value.volume/100);
@@ -369,7 +376,11 @@ $('rangeWeapon').addEventListener('change',event=>{
   selectWeapon(Number(event.target.value));
   canvas.focus({preventScroll:true});
 });
-function clearControls(){keys.clear();touchKeys.clear();slideGesture.reset();grenadePending=false;medkitPending=null;proneRequested=false;requestedInteraction=0;flipPending=null;if(touchJoystick)resetJoystick();}
+function clearControls(){
+  keys.clear();touchKeys.clear();slideGesture.reset();grenadePending=false;medkitPending=null;proneRequested=false;requestedInteraction=0;flipPending=null;
+  for(const [control,pointer] of touchPresses.reset())if(control.hasPointerCapture(pointer))control.releasePointerCapture(pointer);
+  if(touchJoystick)resetJoystick();
+}
 const waitingForMatch=()=>world.match?.phase==='waiting';
 const battleLocked=()=>waitingForMatch()||!!world.countdown;
 function syncBattleMusic(){
@@ -390,7 +401,7 @@ function prepareBattleIntro(mapId,mode){
   $('battleIntroArt').replaceChildren(createMapPreview(map));
 }
 function placeBattleIntro(){
-  const compact=battleIntro.dataset.phase==='live'&&!document.fullscreenElement;
+  const compact=battleIntro.dataset.phase==='live'&&!arenaExpanded();
   const parent=compact?battleIntroDock:$('viewport');
   if(battleIntro.parentElement!==parent)parent.append(battleIntro);
 }
@@ -470,7 +481,29 @@ function clearBattleIntro(){
   battleIntroEntry=null;
   battleIntro.hidden=true;
 }
-document.addEventListener('fullscreenchange',()=>{if(!battleIntro.hidden)placeBattleIntro();});
+const landscapeView=matchMedia('(orientation: landscape)');
+function scrollToBattle(behavior='instant'){
+  const viewport=$('viewport');
+  if(touch)viewport.closest('.arena-panel').scrollIntoView({behavior:'instant',block:'start'});
+  else viewport.scrollIntoView({behavior,block:'center'});
+}
+landscapeView.addEventListener('change',()=>{
+  if(!touch)return;
+  clearControls();
+  if(session&&!arenaExpanded())scrollToBattle();
+});
+function syncArenaFrame(){
+  displaySize=null;
+  clearControls();
+  if(!battleIntro.hidden)placeBattleIntro();
+  if(!arenaExpanded()&&session&&touch)scrollToBattle();
+}
+document.addEventListener('fullscreenchange',syncArenaFrame);
+function expandBattleSurface(expanded){
+  battleSurface.toggleAttribute('data-expanded',expanded);
+  syncArenaFrame();
+  (expanded?$('exitFullscreen'):$('fullscreen')).focus({preventScroll:true});
+}
 function setQueueHeading(mode,mapId){
   $('queueTitle').textContent=mode==='1v1'?'Ожидаем соперника':'Поиск матча';
   $('queueArena').textContent=`${getMap(mapId).name} · ${mode==='ffa'?'Каждый за себя':matchNames[mode]}`;
@@ -481,12 +514,16 @@ function showQueueConnection(mode,mapId){
   $('queueStatus').textContent='Подключаемся к серверу…';
   for(const id of ['queueProgress','duelCodeLabel','queueInvite','queueInviteUrl','queueCancel'])$(id).hidden=true;
   overlay.hidden=false;
-  $('viewport').scrollIntoView({behavior:'instant',block:'center'});
+  scrollToBattle();
+}
+function syncTouchControls(){
+  const hidden=!session||!touch||battleLocked()||world.ended||world.coop?.phase==='waiting';
+  if($('touchControls').hidden!==hidden)$('touchControls').hidden=hidden;
 }
 function syncPlayHud(locked){
   $('matchHud').hidden=locked;
   $('playerHud').hidden=locked;
-  $('touchControls').hidden=locked||!touch;
+  syncTouchControls();
   $('rangeWeapon').disabled=locked;
   canvas.style.cursor=locked?'default':'none';
 }
@@ -544,7 +581,7 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
     if(directMode){
       prepareBattleIntro(mapId,directMode);
       showBattleLoading();
-      $('viewport').scrollIntoView({behavior:'instant',block:'center'});
+      scrollToBattle();
     }
     if(leaving)await leaving;
     await armory.ready;
@@ -593,7 +630,6 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
       next.coop?'ЭКСПЕДИЦИЯ':next.range?'СТРЕЛЬБИЩЕ':next.training?'ТРЕНИРОВКА':`КОМНАТА ${next.room}`;
     $('matchGoal').textContent=next.coop?'СБОР ОТРЯДА':next.range?'СВОБОДНАЯ СТРЕЛЬБА':`ЦЕЛЬ ${TARGET}`;
     $('leave').textContent=next.range?'Вернуться в лобби':'Выйти из боя';
-    $('touchControls').hidden=!touch;
     $('weaponNext').hidden=next.weaponSlots.length<2;
     syncMatchQueue(true);
     if(!next.match)syncPlayHud(battleLocked());
@@ -602,21 +638,19 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
     stream=new EventSource(`/api/events?token=${encodeURIComponent(next.token)}`);
     stream.onmessage=e=>{
       if(session!==next)return;
-      try{
-        world=JSON.parse(e.data);
-        lastState=performance.now();
-        motion.push(world,lastState);
-        feedback.consume(world.combatEvents,next.id,world.time,lastState);
-        armory.setProfile(world.profile,true);
-        if(world.progressError&&!progressWarning)toast('Не удалось сохранить прогресс. Попробуйте позже.');
-        progressWarning=!!world.progressError;
-        $('connection').textContent='● СВЯЗЬ УСТАНОВЛЕНА';
-        const listener=world.players.find(p=>p.id===next.id);
-        audio.consume(world.audioEvents,listener,world.mapId,world.time);
-        audio.updateSlides(world.ended?[]:world.players,listener,world.mapId);
-        updateHud();
-        syncBattleMusic();
-      }catch{}
+      try{world=JSON.parse(e.data);}catch{return;}
+      lastState=performance.now();
+      motion.push(world,lastState);
+      feedback.consume(world.combatEvents,next.id,world.time,lastState);
+      armory.setProfile(world.profile,true);
+      if(world.progressError&&!progressWarning)toast('Не удалось сохранить прогресс. Попробуйте позже.');
+      progressWarning=!!world.progressError;
+      $('connection').textContent='● СВЯЗЬ УСТАНОВЛЕНА';
+      const listener=world.players.find(p=>p.id===next.id);
+      audio.consume(world.audioEvents,listener,world.mapId,world.time);
+      audio.updateSlides(world.ended?[]:world.players,listener,world.mapId);
+      updateHud();
+      syncBattleMusic();
     };
     stream.onerror=()=>{
       if(session!==next)return;
@@ -625,7 +659,7 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
       clearControls();audio.updateJet(false);audio.stopSlides();
     };
     canvas.focus({preventScroll:true});
-    $('viewport').scrollIntoView({behavior:battleLocked()?'instant':'smooth',block:'center'});
+    scrollToBattle(battleLocked()?'instant':'smooth');
   }catch(error){clearBattleIntro();$('error').textContent=error.message;toast(error.message);}
   finally{
     if(showJoining&&!session)$('queueOverlay').hidden=true;
@@ -635,6 +669,8 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
 }
 async function leave(){
   if(!session)return;const old=session;session=null;stream?.close();stream=null;clearControls();motion.reset();canvas.style.cursor='default';
+  if(battleSurface.hasAttribute('data-expanded'))expandBattleSurface(false);
+  if(document.fullscreenElement?.closest('.arena-panel'))void document.exitFullscreen().catch(()=>{});
   document.documentElement.classList.remove('arena-visible');
   audio.stopSlides();
   battleScore.stop();
@@ -710,7 +746,23 @@ async function copyInvitation(manualLink){
 $('invite').onclick=()=>copyInvitation(waitingForMatch()&&session?.match?.mode==='1v1'?$('queueInviteUrl'):null);
 $('help').onclick=()=>{clearControls();$('helpDialog').showModal();};$('closeHelp').onclick=()=>$('helpDialog').close();
 $('helpDialog').addEventListener('click',e=>{if(e.target===$('helpDialog'))$('helpDialog').close();});
-$('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('viewport').requestFullscreen();}catch{toast('Полноэкранный режим недоступен в этом браузере');}};
+async function toggleFullscreen(){
+  if(battleSurface.hasAttribute('data-expanded')){expandBattleSurface(false);return;}
+  try{
+    if(document.fullscreenElement)await document.exitFullscreen();
+    else await (touch?battleSurface:$('viewport')).requestFullscreen();
+  }catch{
+    if(touch&&!document.fullscreenElement)expandBattleSurface(true);
+    else toast('Полноэкранный режим недоступен в этом браузере');
+  }
+}
+$('fullscreen').onclick=toggleFullscreen;
+$('exitFullscreen').onclick=toggleFullscreen;
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Escape'||!battleSurface.hasAttribute('data-expanded')||document.querySelector('dialog[open]'))return;
+  event.preventDefault();
+  expandBattleSurface(false);
+});
 $('sound').onclick=async()=>{
   try{
     const enabled=await audio.toggle();
@@ -726,6 +778,7 @@ function canControl(){
   return !!session&&!isEditing()&&!document.hidden&&!world.ended
     &&!battleLocked()
     &&(!session.coop||world.coop&&world.coop.phase!=='waiting')
+    &&world.players.some(player=>player.id===session.id&&player.dead<=0)
     &&performance.now()-lastState<1500;
 }
 function requestInteraction(){
@@ -794,10 +847,35 @@ window.addEventListener('keyup',event=>{
   keys.delete(event.code);
 });
 window.addEventListener('blur',clearControls);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearControls();});
-window.addEventListener('resize',()=>{touch=matchMedia('(pointer:coarse), (max-width:650px)').matches;$('touchControls').hidden=!touch||!session||battleLocked();});
+document.documentElement.toggleAttribute('data-touch-combat',touch);
+touchMedia.addEventListener('change',event=>{
+  clearControls();
+  touch=event.matches;
+  mouseAim=false;
+  document.documentElement.toggleAttribute('data-touch-combat',touch);
+  if(!touch&&battleSurface.hasAttribute('data-expanded'))expandBattleSurface(false);
+  syncTouchControls();
+  if(touch&&session&&!arenaExpanded())scrollToBattle();
+});
 function mousePosition(e){const r=canvas.getBoundingClientRect();const scale=Math.min(r.width/W,r.height/H),ox=(r.width-W*scale)/2,oy=(r.height-H*scale)/2;mouse={x:(e.clientX-r.left-ox)/scale,y:(e.clientY-r.top-oy)/scale};}
-canvas.addEventListener('pointermove',mousePosition);canvas.addEventListener('pointerdown',e=>{mousePosition(e);if(canControl()&&e.pointerType==='mouse'&&e.button===0){keys.add('Mouse0');canvas.setPointerCapture(e.pointerId);}canvas.focus({preventScroll:true});});
-window.addEventListener('pointerup',()=>keys.delete('Mouse0'));canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('pointermove',event=>{
+  if(event.pointerType==='mouse')mouseAim=true;
+  mousePosition(event);
+});
+canvas.addEventListener('pointerdown',event=>{
+  mouseAim=event.pointerType==='mouse';
+  mousePosition(event);
+  if(canControl()&&mouseAim&&event.button===0){
+    keys.add('Mouse0');
+    canvas.setPointerCapture(event.pointerId);
+  }
+  canvas.focus({preventScroll:true});
+});
+function releaseMouseFire(event){if(event.pointerType==='mouse')keys.delete('Mouse0');}
+window.addEventListener('pointerup',releaseMouseFire);
+window.addEventListener('pointercancel',releaseMouseFire);
+canvas.addEventListener('lostpointercapture',releaseMouseFire);
+canvas.addEventListener('contextmenu',event=>event.preventDefault());
 $('viewport').addEventListener('wheel',event=>{
   if(Math.abs(event.deltaY)<=Math.abs(event.deltaX)||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
   if(event.target.closest('button, a, input, select'))return;
@@ -805,20 +883,21 @@ $('viewport').addEventListener('wheel',event=>{
 },{passive:false});
 $('weaponNext').onclick=()=>cycleWeapon(1);
 touchJoystick=$('touchJoystick');
-let joystickPointerId=null,joystickState={left:false,right:false,jump:false,crouch:false};
+let joystickState={},touchJumpDown=false;
 function resetJoystick(){
-  joystickPointerId=null;
-  joystickState={left:false,right:false,jump:false,crouch:false};
+  joystickState={};
   touchKeys.delete('left');touchKeys.delete('right');touchKeys.delete('jump');touchKeys.delete('crouch');
   touchJoystick?.style.setProperty('--stick-x','0px');touchJoystick?.style.setProperty('--stick-y','0px');
 }
 function updateJoystick(event){
-  const box=touchJoystick.getBoundingClientRect(),radius=box.width*.34;
+  const box=touchJoystick.getBoundingClientRect(),radius=Math.min(box.width,box.height)*.34;
   const dx=event.clientX-(box.left+box.width/2),dy=event.clientY-(box.top+box.height/2);
-  const distance=Math.hypot(dx,dy),scale=distance>radius?radius/distance:1;
-  const x=dx*scale,y=dy*scale,threshold=radius*.3;
-  const next={left:x<-threshold,right:x>threshold,jump:y<-threshold,crouch:y>threshold};
+  const {x,y,actions:next}=sampleJoystick(dx,dy,radius,joystickState);
   if((next.left&&!joystickState.left)||(next.right&&!joystickState.right))tapTouchMovement(next.left?'left':'right');
+  if(next.jump&&!joystickState.jump){
+    touchPresses.queue('jump');
+    touchJumpDown=holding('crouch')||touchKeys.has('down');
+  }
   joystickState=next;
   for(const action of ['left','right','jump','crouch']){
     if(next[action])touchKeys.add(action);
@@ -827,17 +906,27 @@ function updateJoystick(event){
   touchJoystick.style.setProperty('--stick-x',`${x}px`);touchJoystick.style.setProperty('--stick-y',`${y}px`);
 }
 touchJoystick.addEventListener('pointerdown',event=>{
-  event.preventDefault();if(!canControl())return;
-  proneRequested=false;joystickPointerId=event.pointerId;touchJoystick.setPointerCapture(event.pointerId);updateJoystick(event);
+  event.preventDefault();
+  if(event.button!==0||!canControl()||!touchPresses.claim(touchJoystick,event.pointerId))return;
+  mouseAim=false;
+  proneRequested=false;touchJoystick.setPointerCapture(event.pointerId);updateJoystick(event);
 });
-touchJoystick.addEventListener('pointermove',event=>{if(event.pointerId===joystickPointerId)updateJoystick(event);});
-for(const type of ['pointerup','pointercancel','lostpointercapture'])touchJoystick.addEventListener(type,event=>{if(event.pointerId===joystickPointerId)resetJoystick();});
+touchJoystick.addEventListener('pointermove',event=>{
+  if(touchPresses.owns(touchJoystick,event.pointerId))updateJoystick(event);
+});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])touchJoystick.addEventListener(type,event=>{
+  if(!touchPresses.release(touchJoystick,event.pointerId))return;
+  if(type!=='pointerup')touchPresses.cancel('jump');
+  resetJoystick();
+});
 $('flipButton').addEventListener('click',event=>{if(event.detail===0)requestFlip();});
 document.querySelectorAll('[data-control]:not([data-control="weapon"])').forEach(button=>{
   const control=button.dataset.control;
   button.addEventListener('pointerdown',event=>{
     event.preventDefault();
-    if(!canControl())return;
+    if(event.button!==0||!canControl()||!touchPresses.claim(button,event.pointerId))return;
+    mouseAim=false;
+    button.setPointerCapture(event.pointerId);
     if(control==='flip'){requestFlip();return;}
     if(control==='prone'){
       proneRequested=!proneRequested;
@@ -846,46 +935,65 @@ document.querySelectorAll('[data-control]:not([data-control="weapon"])').forEach
     if(['crouch','jump','jet'].includes(control))proneRequested=false;
     tapTouchMovement(control);
     touchKeys.add(control);
-    button.setPointerCapture(event.pointerId);
+    if(control==='fire'||control==='reload')touchPresses.queue(control);
   });
-  for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,()=>{
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,event=>{
+    if(!touchPresses.release(button,event.pointerId))return;
     if(type==='pointerup'&&control==='grenade'&&touchKeys.has(control)&&canControl())grenadePending=true;
+    if(type!=='pointerup')touchPresses.cancel(control);
     touchKeys.delete(control);
   });
 });
-function arenaViewY(map,p){
-  const bottom=Math.max(0,map.height-H/(map.zoom||1));
-  if(!(map.tidal||map.followY)||!p)return bottom;
-  return Math.min(bottom,Math.max(0,p.y-H/(map.zoom||1)*.60));
+function arenaZoom(map){
+  const zoom=map.zoom||1;
+  return touch&&session&&!landscapeView.matches?Math.max(1.24,zoom):zoom;
+}
+function arenaViewY(map,p,zoom=arenaZoom(map)){
+  const bottom=Math.max(0,map.height-H/zoom);
+  if(!(map.tidal||map.followY||zoom>(map.zoom||1))||!p)return bottom;
+  return Math.min(bottom,Math.max(0,p.y-H/zoom*.60));
 }
 function pointerAimAngle(p,map){
-  const zoom=map.zoom||1;
-  return Math.atan2(mouse.y/zoom+arenaViewY(map,p)-(p.y-shotOriginHeight(p.stance)),mouse.x/zoom+camera.x-p.x);
+  const zoom=arenaZoom(map);
+  return Math.atan2(mouse.y/zoom+arenaViewY(map,p,zoom)-(p.y-shotOriginHeight(p.stance)),mouse.x/zoom+camera.x-p.x);
 }
 function input(){
-  const p=world.players.find(player=>player.id===session?.id),map=getMap(world.mapId);
-  const originY=p?p.y-shotOriginHeight(p.stance):0;
-  let angle=p?pointerAimAngle(p,map):0;
-  if(touch&&p){
-    const target=world.players.filter(player=>player!==p&&player.dead<=0&&(!session?.coop||player.coopEnemy)
-      &&(!world.teams||player.team!==p.team)&&!isConcealedFrom(map,p,player))
-      .sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y))[0];
-    angle=target?Math.atan2(target.y-shotOriginHeight(target.stance)-originY,target.x-p.x):p.angle;
-  }
+  const p=world.players.find(player=>player.id===session?.id);
   const active=canControl();
+  const left=active&&(holding('left')||touchKeys.has('left')),right=active&&(holding('right')||touchKeys.has('right'));
   const jump=active&&!p?.medkit&&(holding('jump')||touchKeys.has('jump'));
   const jet=active&&!p?.medkit&&(holding('jet')||touchKeys.has('jet'));
-  const changeStance=active&&!jump&&!jet;
-  return {left:active&&(holding('left')||touchKeys.has('left')),right:active&&(holding('right')||touchKeys.has('right')),
+  const touchJumpSeq=active?touchPresses.pending('jump'):undefined;
+  const changeStance=active&&!jump&&!jet&&!touchJumpSeq;
+  return {left,right,
     jump,jet,down:active&&(holding('crouch')||touchKeys.has('crouch')||touchKeys.has('down')),crouch:changeStance&&(holding('crouch')||touchKeys.has('crouch')),prone:changeStance&&proneRequested,
-    fire:active&&(keys.has('Mouse0')||touchKeys.has('fire')),reload:active&&(holding('reload')||touchKeys.has('reload')),grenade:active&&grenadePending,
-    interact:active?requestedInteraction:0,angle,weapon:session?.weapon,...(active&&medkitPending),...(active&&flipPending)};
+    fire:active&&(keys.has('Mouse0')||touchKeys.has('fire')||!!touchPresses.pending('fire')),
+    reload:active&&(holding('reload')||touchKeys.has('reload')||!!touchPresses.pending('reload')),grenade:active&&grenadePending,
+    interact:active?requestedInteraction:0,...(touchJumpSeq&&{touchJumpSeq,touchJumpDown}),
+    angle:combatAim(p,left,right),weapon:session?.weapon,...(active&&medkitPending),...(active&&flipPending)};
+}
+function combatAim(p,left,right){
+  if(!p)return 0;
+  const map=getMap(world.mapId);
+  if(!usesTouchAim())return pointerAimAngle(p,map);
+  const zoom=arenaZoom(map),viewY=arenaViewY(map,p,zoom),margin=22;
+  const origin={x:p.x,y:p.y-shotOriginHeight(p.stance)};
+  const physicalMap=mapWithMechanisms(map,world.mechanisms,world.bridgeHealth);
+  const points=world.players.filter(player=>player!==p&&player.dead<=0&&(!session?.coop||player.coopEnemy)
+    &&(!world.teams||player.team!==p.team)&&!isConcealedFrom(map,p,player)
+    &&player.x>=camera.x-margin&&player.x<=camera.x+W/zoom+margin
+    &&player.y>=viewY-margin&&player.y<=viewY+H/zoom+margin)
+    .map(player=>({x:player.x,y:player.y-shotOriginHeight(player.stance)}));
+  const target=nearestVisibleAimPoint(origin,points,[...physicalMap.platforms,...(physicalMap.solids??[])]);
+  return target?Math.atan2(target.y-origin.y,target.x-origin.x):left!==right?(left?Math.PI:0):p.angle;
 }
 setInterval(async()=>{
   if(!session||inputPending)return;
   if(performance.now()-lastState>12000){toast('Связь с сервером потеряна. Войди в бой снова.');leave();return;}
   inputPending=true;
   const current=session,controls=input();
+  const fire=controls.fire?touchPresses.pending('fire'):undefined;
+  const reload=controls.reload?touchPresses.pending('reload'):undefined;
   const slide=slideGesture.take(performance.now());
   if(slide&&canControl())controls.slide=slide;
   try{
@@ -893,6 +1001,11 @@ setInterval(async()=>{
     if(session===current&&controls.grenade)grenadePending=false;
     if(session===current&&controls.medkitSeq===medkitPending?.medkitSeq)medkitPending=null;
     if(session===current&&controls.flip===flipPending?.flip)flipPending=null;
+    if(session===current){
+      touchPresses.acknowledge('jump',controls.touchJumpSeq);
+      touchPresses.acknowledge('fire',fire);
+      touchPresses.acknowledge('reload',reload);
+    }
   }catch(error){if(session===current&&error.status===401){toast(error.message);leave();}}
   finally{inputPending=false;}
 },50);
@@ -936,10 +1049,10 @@ function updateHud(){
   if(!session)return;
   const waiting=syncMatchQueue(),me=world.players.find(p=>p.id===session.id);
   updateBattleIntro(!!me&&!waiting);
+  syncTouchControls();
   if(waiting||!me)return;
   if(!world.match&&$('matchHud').hidden!==battleLocked())syncPlayHud(battleLocked());
-  if(me.dead>0){proneRequested=false;slideGesture.reset();medkitPending=null;flipPending=null;}
-  $('crouchButton').setAttribute('aria-pressed',String(me.stance==='crouch'&&me.dead<=0));
+  if(me.dead>0)clearControls();
   $('proneButton').setAttribute('aria-pressed',String(me.stance==='prone'&&me.dead<=0));
   $('timer').textContent=`${String(Math.floor(world.time/60)).padStart(2,'0')}:${String(Math.floor(world.time%60)).padStart(2,'0')}`;
   $('health').textContent=me.hp;$('healthBar').style.width=`${me.hp}%`;$('weaponName').textContent=weapons[me.weapon].short;
@@ -1308,7 +1421,7 @@ function renderPlayers(players,dt,angle,map){
     const target=player.stanceHeight??PLAYER_HEIGHT,previous=visualActors.get(player.id);
     const sameLife=previous&&previous.deaths===player.deaths&&previous.spawnAt===player.spawnAt&&previous.dead===(player.dead>0);
     const stance=stepVisualStance(sameLife?previous:null,target,dt);
-    const ownAim=player.id===session?.id&&!touch&&player.dead<=0;
+    const ownAim=player.id===session?.id&&!usesTouchAim()&&player.dead<=0;
     const visualAngle=ownAim?stepVisualAim(sameLife?previous.angle:undefined,angle,dt):player.angle;
     const speed=player.vx??0;
     const visualSpeed=sameLife?previous.speed+(speed-previous.speed)*(1-Math.exp(-13*dt)):speed;
@@ -1409,8 +1522,9 @@ function render(t){
   updateBuffHud(focus);
   const physicalMap=mapWithMechanisms(map,scene.mechanisms,scene.bridgeHealth);
   updateInteractionPrompt(map);
-  const aimX=session&&!touch?mouse.x:W/2+Math.cos(focus?.angle??0)*W/2;
-  const zoom=map.zoom||1,baseY=arenaViewY(map,focus);
+  const touchAim=usesTouchAim();
+  const aimX=session&&!touchAim?mouse.x:W/2+Math.cos(focus?.angle??0)*W/2;
+  const zoom=arenaZoom(map),baseY=arenaViewY(map,focus,zoom);
   if(Number.isFinite(focus?.portalAt)&&focus.portalAt!==lastPortalCamera)camera.reset();
   lastPortalCamera=focus?.portalAt;
   const baseX=camera.update(focus,aimX,dt,map.width,zoom);
@@ -1420,7 +1534,7 @@ function render(t){
     : {x:0,y:0};
   const viewX=baseX+shake.x,viewY=baseY+shake.y;
   const view={x:viewX,y:viewY,width:W/zoom,height:H/zoom};
-  const angle=session&&focus?touch?input().angle:pointerAimAngle(focus,map):0;
+  const angle=session&&focus?touchAim?focus.angle:pointerAimAngle(focus,map):0;
   const concealed=player=>!!session&&player.id!==focus?.id&&
     !(world.teams&&player.team===focus?.team)&&!(world.coop&&!player.bot)&&
     isConcealedFrom(map,focus,player);
@@ -1495,7 +1609,7 @@ function render(t){
     if(!pickupNotices.has(notice.owner))pickupNotices.set(notice.owner,[]);
     pickupNotices.get(notice.owner).push(notice);
   }
-  const labelScreen={x:viewX,y:viewY,zoom,width:W,unit,pixel,fadePickups:!reducedMotion.matches};
+  const labelScreen={x:viewX,y:viewY,zoom,width:W,unit:touch?unit*.84:unit,pixel,fadePickups:!reducedMotion.matches};
   for(const p of players){
     if(p.x<viewX||p.x>viewX+view.width||p.y<viewY||p.y>viewY+view.height)continue;
     if(concealed(p))continue;
@@ -1504,7 +1618,7 @@ function render(t){
       teamColor:world.teams?teamFightColors[p.team]:teamColors[p.team],pickupNotices:pickupNotices.get(p.id),screen:labelScreen});
   }
   hud.globalAlpha=1;
-  if(session&&!world.ended)feedback.draw(hud,{now:t,x:viewX,y:viewY,zoom,width:W,height:H,aimX:touch&&focus?(focus.x-viewX)*zoom:mouse.x,aimY:touch&&focus?(focus.y-shotOriginHeight(focus.stance)-viewY)*zoom:mouse.y,numbers:preferences.effects});
+  if(session&&!world.ended)feedback.draw(hud,{now:t,x:viewX,y:viewY,zoom,width:W,height:H,aimX:touchAim&&focus?(focus.x-viewX)*zoom:mouse.x,aimY:touchAim&&focus?(focus.y-shotOriginHeight(focus.stance)-viewY)*zoom:mouse.y,numbers:preferences.effects});
   const aiming=!!(canControl()&&(holding('grenade')||touchKeys.has('grenade'))&&focus?.dead<=0&&focus.grenades>0&&focus.grenadeCool<=0);
   $('grenadeAimHint').hidden=!aiming;
   if(aiming){
@@ -1513,8 +1627,9 @@ function render(t){
     const points=grenadeTrajectory(focus,physicalMap,angle),end=points.at(-1);hud.save();hud.scale(zoom,zoom);hud.translate(-viewX,-viewY);hud.strokeStyle='#f2ffd2';hud.shadowColor='#162a20';hud.shadowBlur=4;hud.lineWidth=2/zoom;hud.setLineDash([5/zoom,7/zoom]);hud.beginPath();points.forEach((p,i)=>i?hud.lineTo(p.x,p.y):hud.moveTo(p.x,p.y));hud.stroke();hud.setLineDash([]);hud.beginPath();hud.arc(end.x,end.y,9/zoom,0,Math.PI*2);hud.stroke();hud.restore();
   }
   drawMinimap(hud,{map,physicalMap,players:session?scene.players.filter(player=>!concealed(player)):[],viewX:baseX,viewY:baseY,viewWidth:view.width,viewHeight:view.height,
-    focus,width:W,height:H,unit,pixel,touch:touch&&!!session});
-  if(session&&!touch&&!world.ended&&!battleLocked()){const p=world.players.find(p=>p.id===session.id);if(p&&p.dead<=0){hud.save();hud.shadowColor='#132b1c';hud.shadowBlur=4;hud.strokeStyle='#e7fac0';hud.lineWidth=2;hud.beginPath();hud.arc(mouse.x,mouse.y,8,0,Math.PI*2);hud.stroke();line(hud,mouse.x-14,mouse.y,mouse.x-5,mouse.y,'#e7fac0',2);line(hud,mouse.x+5,mouse.y,mouse.x+14,mouse.y,'#e7fac0',2);line(hud,mouse.x,mouse.y-14,mouse.x,mouse.y-5,'#e7fac0',2);line(hud,mouse.x,mouse.y+5,mouse.x,mouse.y+14,'#e7fac0',2);hud.restore();}}
+    focus,width:W,height:H,unit,pixel,coop:!!world.coop,
+    touch:touch&&session?(landscapeView.matches?'landscape':'portrait'):null});
+  if(session&&!touchAim&&!world.ended&&!battleLocked()){const p=world.players.find(p=>p.id===session.id);if(p&&p.dead<=0){hud.save();hud.shadowColor='#132b1c';hud.shadowBlur=4;hud.strokeStyle='#e7fac0';hud.lineWidth=2;hud.beginPath();hud.arc(mouse.x,mouse.y,8,0,Math.PI*2);hud.stroke();line(hud,mouse.x-14,mouse.y,mouse.x-5,mouse.y,'#e7fac0',2);line(hud,mouse.x+5,mouse.y,mouse.x+14,mouse.y,'#e7fac0',2);line(hud,mouse.x,mouse.y-14,mouse.x,mouse.y-5,'#e7fac0',2);line(hud,mouse.x,mouse.y+5,mouse.x,mouse.y+14,'#e7fac0',2);hud.restore();}}
   if(holding('score')&&session&&!session.range&&!session.coop&&!battleLocked())drawScoreboard();
 }
 function frame(time){

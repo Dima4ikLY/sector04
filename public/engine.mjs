@@ -268,11 +268,11 @@ function groundSupport(p,surfaces,width=stances[p.stance].halfWidth){
   if(p.jumps!==0||Math.abs(p.vy)>=1)return null;
   return surfaces.find(s=>!s.vertices&&p.y===s.y&&p.x+width>s.x&&p.x-width<s.x+s.w);
 }
-function updateStance(p,input,map,solids,grounded,allowSlide=true){
+function updateStance(p,input,map,solids,grounded,jumpPressed,allowSlide){
   const dimensions=stance=>map.tidal&&stance==='stand'?{...stances.stand,height:72,halfWidth:20}:stances[stance];
   const slideRequest=input.slide;
   if(slideRequest)input.slide=0;
-  const jumping=input.jump&&(grounded||!p.previous.jump);
+  const jumping=jumpPressed||(input.jump&&grounded);
   const startsSlide=allowSlide&&p.stance==='stand'&&!jumping&&!input.jet&&(slideRequest===-1||slideRequest===1);
   let desired='stand';
   if(grounded&&input.prone)desired='prone';
@@ -649,6 +649,12 @@ function takeFlipInput(player){
   player.lastFlip=sequence;
   return true;
 }
+function takeTouchJumpInput(player){
+  const sequence=player.input.touchJumpSeq;
+  if(!Number.isSafeInteger(sequence)||sequence<=(player.lastTouchJump??0))return false;
+  player.lastTouchJump=sequence;
+  return true;
+}
 function endFlip(player,time){
   if(!player.flip)return;
   delete player.flip;
@@ -815,14 +821,14 @@ function tidalEnvironment(p,map,{height,halfWidth}){
   const jet=jets.find(j=>p.x+halfWidth>j.x&&p.x-halfWidth<j.x+j.w&&p.y>j.y&&p.y-height<j.y+j.h);
   return {bodyY,inWater,jet};
 }
-function tidalMovement(p,input,map,shape,dt,jumpPressed){
+function tidalMovement(p,input,map,shape,dt,jumpPressed,jumpDown){
   const {tidal}=map;
   const {water,slope}=tidal;
   const {bodyY,inWater,jet}=tidalEnvironment(p,map,shape);
   if(!inWater||p.vy>=0)p.waterLeap=false;
   if(jet){p.vy=jet.velocity;return true;}
   if(inWater&&!p.waterLeap){
-    if(jumpPressed&&!input.down&&bodyY<water.y+tidal.surfaceBand){
+    if(jumpPressed&&!jumpDown&&bodyY<water.y+tidal.surfaceBand){
       p.waterLeap=true;p.vy=-map.jumpSpeed;p.jumps=1;
     }else{
       p.vx=((input.right?1:0)-(input.left?1:0))*tidal.swimSpeed;
@@ -856,6 +862,7 @@ export function step(world,dt) {
   for(const p of world.players){
     const medkitRequest=takeMedkitInput(p);
     const flipRequest=takeFlipInput(p);
+    const touchJumpPressed=takeTouchJumpInput(p);
     if(p.target){
       if(p.dead>0){
         if(pendingDeathFalls.has(p))updateDeathFall(world,map,p,groundSupport(p,obstacles),p.x,p.y,0,dt);
@@ -922,18 +929,19 @@ export function step(world,dt) {
       const {inWater,jet}=tidalEnvironment(p,map,stances.slide);
       allowSlide=!jet&&(!inWater||(p.waterLeap&&p.vy<0));
     }
-    const {height,halfWidth,speed}=updateStance(p,i,map,solids,!!support,allowSlide);
+    const jumpPressed=!treating&&(touchJumpPressed||i.jump&&!p.previous.jump);
+    const {height,halfWidth,speed}=updateStance(p,i,map,solids,!!support,jumpPressed,allowSlide);
     const standing=p.stance==='stand';
     const sliding=p.stance==='slide';
     p.vx=sliding
       ? p.slideDirection*(slideEndSpeed+(slideStartSpeed-slideEndSpeed)*(p.slide/SLIDE_DURATION))
       : ((i.right?1:0)-(i.left?1:0))*(p.bot?(world.match?.botSpeed??155):(tidal?.speed??285))*speed*(treating?medkitSpeed:1)*
         (p.buffs.speed>0?PICKUP_TYPES.speed.multiplier:1);
-    const jumpPressed=!treating&&i.jump&&!p.previous.jump;
     if(tidal)p.dropTime=Math.max(0,p.dropTime-dt);
-    const dropping=tidal&&i.down&&jumpPressed&&platforms.includes(support);
+    const jumpDown=touchJumpPressed?i.touchJumpDown:i.down;
+    const dropping=tidal&&jumpDown&&jumpPressed&&platforms.includes(support);
     if(dropping){p.dropTime=tidal.dropTime;p.jumps=1;}
-    const assisted=tidal&&tidalMovement(p,i,map,{height,halfWidth},dt,jumpPressed);
+    const assisted=tidal&&tidalMovement(p,i,map,{height,halfWidth},dt,jumpPressed,jumpDown);
     const jumping=!assisted&&!dropping&&standing&&jumpPressed&&!p.waterLeap&&p.jumps<(map.maxJumps||2);
     if(jumping){p.vy=-(map.jumpSpeed||590);p.jumps++;}
     if(!i.jet&&p.jetFuel>=20)p.jetLocked=false;

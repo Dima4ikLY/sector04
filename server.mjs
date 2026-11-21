@@ -442,6 +442,9 @@ export function createArenaServer({
           const i=b.input||{},player=s.player;
           // Keep the pulse until a simulation tick consumes it, even if newer controls arrive first.
           const slide=i.slide===-1||i.slide===1?i.slide:player.input.slide??0;
+          const newJump=Number.isSafeInteger(i.touchJumpSeq)&&i.touchJumpSeq>(player.input.touchJumpSeq??0);
+          const touchJumpSeq=newJump?i.touchJumpSeq:player.input.touchJumpSeq;
+          const touchJumpDown=newJump?i.touchJumpDown===true:player.input.touchJumpDown;
           const newFlip=Number.isSafeInteger(i.flip)&&i.flip>(player.input.flip??0);
           const flip=newFlip?i.flip:player.input.flip;
           const flipDirection=newFlip
@@ -452,7 +455,7 @@ export function createArenaServer({
             s.medkitSeq=i.medkitSeq;
             ({medkit,medkitSeq}=i);
           }
-          player.input={left:!!i.left,right:!!i.right,jump:!!i.jump,jet:!!i.jet,fire:!!i.fire,reload:!!i.reload,grenade:!!i.grenade,
+          player.input={left:!!i.left,right:!!i.right,jump:!!i.jump,touchJumpSeq,touchJumpDown,jet:!!i.jet,fire:!!i.fire,reload:!!i.reload,grenade:!!i.grenade,
             crouch:i.crouch===true,down:i.down===true,prone:i.prone===true,interact:i.interact===true||(Number.isSafeInteger(i.interact)&&i.interact>0?i.interact:0),
             slide:player.dead>0?0:slide,flip,flipDirection,...(player.dead>0||!medkit?{}:{medkit,medkitSeq}),
             angle:Number.isFinite(i.angle)?i.angle:0,weapon:Number.isInteger(i.weapon)?i.weapon:undefined};
@@ -487,7 +490,7 @@ export function createArenaServer({
       Object.assign(files,{'/operations.css':'operations.css','/operations-panels.css':'operations-panels.css','/actor-motion.mjs':'actor-motion.mjs','/death-motion.mjs':'death-motion.mjs','/arena-effects.mjs':'arena-effects.mjs',
         '/grenade-effects.mjs':'grenade-effects.mjs','/skin-effects.mjs':'skin-effects.mjs','/skin-transitions.mjs':'skin-transitions.mjs',
         '/map-interactives.mjs':'map-interactives.mjs','/tidal-station.mjs':'tidal-station.mjs','/pickups.mjs':'pickups.mjs','/pickup-effects.mjs':'pickup-effects.mjs','/covers.mjs':'covers.mjs',
-        '/hud-metrics.mjs':'hud-metrics.mjs','/minimap.mjs':'minimap.mjs',
+        '/hud-metrics.mjs':'hud-metrics.mjs','/minimap.mjs':'minimap.mjs','/touch-input.mjs':'touch-input.mjs',
         '/team-bots.mjs':'team-bots.mjs','/team-routes.mjs':'team-routes.mjs',
         '/art/arena-atlas.png':'art/arena-atlas.png','/audio/weapon-shots.wav':'audio/weapon-shots.wav',
         '/audio/mechanisms.wav':'audio/mechanisms.wav','/audio/footsteps.wav':'audio/footsteps.wav',

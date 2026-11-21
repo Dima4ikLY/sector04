@@ -722,7 +722,6 @@ body:has(.startup-screen:not([hidden])) { overflow: hidden; }
   transform: none;
   width: min(190px,45%);
 }
-.viewport.dungeon-view:has(.touch-controls:not([hidden])) .reload-indicator { bottom: 64px; }
 .viewport .reload-track { background: #354858; }
 .viewport .reload-track i { background: var(--accent); }
 .viewport .grenade-aim-hint { color: var(--accent-pale); }
@@ -731,9 +730,6 @@ body:has(.startup-screen:not([hidden])) { overflow: hidden; }
 .viewport .killfeed b { color: var(--accent-pale); }
 .viewport .death-message { background: #121b23ea; border-color: #794945; color: #ffd5cd; }
 .viewport .fps-counter { background: #14222ce6; color: #afc9d9; }
-.viewport .touch-controls button { color: #fff0dc; border-color: #97a4ae; background: #182630e8; }
-.viewport #weaponNext { padding: 0; }
-.viewport .touch-controls [aria-pressed="true"] { background: var(--accent); color: #231708; border-color: #ffd397; }
 .viewport .interaction-button {
   position: absolute;
   z-index: 9;
@@ -756,7 +752,6 @@ body:has(.startup-screen:not([hidden])) { overflow: hidden; }
 .viewport .interaction-button:not(:disabled):is(:hover,:focus-visible) { color: #101e24; background: #a6e9ee; }
 .viewport .interaction-button:disabled { cursor: default; }
 .interaction-button kbd { padding: 2px 4px; border: 1px solid currentColor; border-radius: 3px; font: 700 11px/1 var(--mono); }
-.viewport:has(.touch-controls:not([hidden])) .interaction-button { bottom: max(26%, 49px); min-height: 36px; }
 .viewport .result { background: #0e1720e8; }
 .viewport .result:is([data-phase="outro"], [data-phase="summary"]) {
   z-index: 14;
@@ -1092,23 +1087,18 @@ footer { margin-top: 20px; padding: 16px 0 22px; border-color: var(--line); colo
   .viewport .player-hud span { font-size: 6px; }
   .viewport .player-hud strong { font-size: 14px; }
   .viewport .player-hud .health-track { width: 46px; }
-  .viewport #playerHud:has(:is(#armorHud, #helmetHud):not([hidden])) ~ .killfeed { top: 77px; }
-  .viewport { --touch-button-height: clamp(28px, 8vw, 41px); }
-  .viewport .touch-controls { left: 5px; right: 5px; bottom: 5px; }
-  .viewport .touch-controls > div { gap: 3px; }
-  .viewport .touch-controls button { width: clamp(25px, 8vw, 41px); height: var(--touch-button-height); }
-  .viewport .touch-controls .control-label { font-size: 8px; }
+  html:not([data-touch-combat]) .viewport #playerHud:has(:is(#armorHud, #helmetHud):not([hidden])) ~ .killfeed { top: 77px; }
   .viewport #reloadIndicator {
-    inset: auto auto calc(11px + var(--touch-button-height)) 6px;
+    inset: auto auto calc(11px + clamp(28px, 8vw, 41px)) 6px;
     transform: none;
     width: min(148px,45%);
     padding: 6px 8px;
   }
-  .viewport:has(.medkit-indicator:not([hidden])) #reloadIndicator { left: auto; right: 6px; width: min(148px, 30%); }
+  html:not([data-touch-combat]) .viewport:has(.medkit-indicator:not([hidden])) #reloadIndicator { left: auto; right: 6px; width: min(148px, 30%); }
   #reloadIndicator > div:first-child { gap: 8px; font-size: 8px; letter-spacing: .04em; }
   #reloadIndicator .reload-track { height: 4px; margin-top: 4px; }
-  :is(#grenadeAimHint,#interactionButton):not([hidden]) ~ #reloadIndicator { padding-block: 1px; }
-  :is(#grenadeAimHint,#interactionButton):not([hidden]) ~ #reloadIndicator > div:first-child { display: none; }
+  html:not([data-touch-combat]) :is(#grenadeAimHint,#interactionButton):not([hidden]) ~ #reloadIndicator { padding-block: 1px; }
+  html:not([data-touch-combat]) :is(#grenadeAimHint,#interactionButton):not([hidden]) ~ #reloadIndicator > div:first-child { display: none; }
   :is(#grenadeAimHint,#interactionButton):not([hidden]) ~ #reloadIndicator .reload-track { margin-top: 0; }
 }
 @media (max-width: 420px) {
@@ -1545,59 +1535,6 @@ footer { margin-top: 20px; padding: 16px 0 22px; border-color: var(--line); colo
   transform: none;
 }
 
-/* ===== Touch controls: movement stays on the joystick, combat stays clear ===== */
-@media (pointer: coarse), (max-width: 650px) {
-  .viewport .touch-controls {
-    --touch-size: clamp(82px, 24vw, 118px);
-    left: max(10px, env(safe-area-inset-left));
-    right: max(10px, env(safe-area-inset-right));
-    bottom: max(10px, env(safe-area-inset-bottom));
-    align-items: end;
-  }
-  .viewport .touch-joystick {
-    position: relative;
-    display: grid;
-    place-items: center;
-    width: var(--touch-size);
-    height: var(--touch-size);
-    pointer-events: auto;
-    touch-action: none;
-    user-select: none;
-  }
-  .touch-joystick-ring,
-  .touch-joystick-knob {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-  }
-  .touch-joystick-ring { inset: 0; border: 1px solid #b4c0c8a8; background: #12202ab8; box-shadow: inset 0 0 0 8px #ffffff08, 0 4px 14px #0005; }
-  .touch-joystick-knob { width: 45%; height: 45%; border: 1px solid #ffd397; background: #344350ed; transform: translate(var(--stick-x, 0px), var(--stick-y, 0px)); box-shadow: 0 3px 8px #0006; }
-  .touch-joystick-hint { position: relative; color: #dbe7ed99; font: 700 16px/1 var(--mono); pointer-events: none; }
-  .viewport .touch-actions {
-    --touch-action-size: clamp(34px, 10.5vw, 54px);
-    display: grid;
-    grid-template-columns: repeat(4, var(--touch-action-size));
-    gap: 6px;
-    align-items: end;
-    pointer-events: none;
-  }
-  .viewport .touch-actions button { display: grid; place-items: center; width: 100%; aspect-ratio: 1; height: auto; padding: 0; border-radius: 50%; font: 700 16px/1 var(--mono); pointer-events: auto; }
-  .viewport .touch-actions .touch-fire { grid-row: span 2; width: 100%; height: 100%; min-height: calc(var(--touch-action-size) * 2 + 6px); border-color: #ffd397; background: #4b392ad9; color: #fff0dc; font-size: 29px; }
-  .viewport .touch-actions .touch-flip { font-size: clamp(8px, 2.25vw, 10px); }
-  .viewport .player-hud { top: 43px; bottom: auto; left: 7px; gap: 7px; padding: 5px 7px; border-color: #5f7688aa; background: #101b24c9; }
-  .viewport .player-hud > div { min-width: 34px; }
-  .viewport .player-hud span { display: none; }
-  .viewport .player-hud strong { margin: 0; font-size: 13px; }
-  .viewport .player-hud .health-track { width: 42px; }
-  .viewport .killfeed { top: 43px; right: 6px; max-width: 42%; font-size: 6px; }
-  .viewport .match-hud { top: 6px; left: 7px; right: 7px; }
-  .viewport .match-hud strong { font-size: 16px; padding: 4px 8px; }
-  .viewport .hud-mode { max-width: 35%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 5px; font-size: 6px; }
-  .controls-strip { display: none; }
-  :root[data-touch-layout="right"] .touch-controls { flex-direction: row-reverse; }
-  :root[data-touch-layout="right"] .touch-actions { direction: rtl; }
-}
-
 /* Unified lobby */
 .layout {
   padding: clamp(12px, 1.4vw, 24px);
@@ -1660,4 +1597,242 @@ html:not(.arena-visible) .arena-panel { display: none; }
 @media (max-width: 620px) {
   .lobby-heading #cameraHint { flex-basis: 100%; }
   .layout .map-search > .map-search-actions { min-width: 0; width: 100%; }
+}
+
+/* Touch battle layout keeps the camera in a separate, proportional frame. */
+.battle-surface { position: relative; }
+#exitFullscreen { display: none; }
+
+html[data-touch-combat].arena-visible .layout {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "arena" "sidebar" "heading" "maps" "search";
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+html[data-touch-combat].arena-visible .sidebar { padding-inline: 0; border-inline: 0; }
+html[data-touch-combat] .arena-top { min-height: 44px; padding: 3px 8px; }
+html[data-touch-combat] .arena-top > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-touch-combat] #fullscreen { width: 38px; height: 36px; font-size: 19px; }
+html[data-touch-combat] .controls-strip { display: none; }
+
+html[data-touch-combat] .battle-surface {
+  --touch-size: clamp(72px, 23vw, 108px);
+  --touch-action-size: clamp(36px, 10.7vw, 50px);
+  --touch-gap: 5px;
+  --touch-action-width: calc(4 * var(--touch-action-size) + 3 * var(--touch-gap));
+}
+.battle-surface > .touch-controls {
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+  z-index: 4;
+}
+.battle-surface:has(.result:not([hidden])) > .touch-controls { display: none; }
+.battle-surface .touch-joystick {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--touch-size);
+  height: var(--touch-size);
+  flex: none;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+.touch-joystick-ring,
+.touch-joystick-knob {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.touch-joystick-ring { inset: 0; border: 1px solid #b4c0c8a8; background: #12202ab8; box-shadow: inset 0 0 0 8px #ffffff08, 0 4px 14px #0005; }
+.touch-joystick-knob { width: 45%; height: 45%; border: 1px solid #ffd397; background: #344350ed; transform: translate(var(--stick-x, 0px), var(--stick-y, 0px)); box-shadow: 0 3px 8px #0006; }
+.touch-joystick-hint { position: relative; color: #dbe7ed99; font: 700 16px/1 var(--mono); pointer-events: none; }
+.battle-surface .touch-actions {
+  display: grid;
+  grid-template-columns: repeat(4, var(--touch-action-size));
+  gap: var(--touch-gap);
+  align-items: end;
+}
+.battle-surface .touch-actions button {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  height: auto;
+  padding: 0;
+  border-radius: 50%;
+  border-color: #97a4ae;
+  background: #182630e8;
+  color: #fff0dc;
+  font: 700 17px/1 var(--mono);
+  pointer-events: auto;
+}
+.battle-surface .touch-actions .touch-fire { border-color: #ffd397; background: #4b392ad9; font-size: 27px; }
+.battle-surface .touch-actions .touch-flip { font: 800 9px/1 Manrope, sans-serif; }
+.battle-surface .touch-actions :is([aria-pressed="true"],:active) { background: var(--accent); color: #231708; border-color: #ffd397; }
+html[data-touch-layout="right"] .battle-surface > .touch-controls { flex-direction: row-reverse; }
+html[data-touch-layout="right"] .battle-surface .touch-actions { direction: rtl; }
+
+html[data-touch-combat] .viewport .match-hud {
+  inset: 6px 7px auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 6px;
+}
+html[data-touch-combat] .viewport #timer { grid-column: 2; font-size: 16px; padding: 4px 8px; }
+html[data-touch-combat] .viewport :is(.hud-mode,#matchGoal) {
+  min-width: 0;
+  padding: 4px 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 8px;
+}
+html[data-touch-combat] .viewport .hud-mode { grid-column: 1; max-width: 100%; justify-self: start; }
+html[data-touch-combat] .viewport #matchGoal { grid-column: 3; max-width: 100%; justify-self: end; }
+html[data-touch-combat] .viewport .player-hud {
+  inset: 36px auto auto 7px;
+  max-width: 73%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 7px;
+  padding: 4px 6px;
+  border-color: #5f7688aa;
+  background: #101b24dc;
+}
+html[data-touch-combat] .viewport .player-hud > div { min-width: 0; }
+html[data-touch-combat] .viewport .player-hud > div > span { font-size: 7px; line-height: 1.1; }
+html[data-touch-combat] .viewport .player-hud > div > strong { margin: 2px 0 0; font-size: 13px; white-space: nowrap; }
+html[data-touch-combat] .viewport .player-hud .health-track { width: 37px; }
+html[data-touch-combat] .viewport .medkit-slots { margin: 1px 0 0; gap: 3px; }
+html[data-touch-combat] .viewport .medkit-slots button { min-width: 29px; min-height: 27px; padding: 2px 3px; }
+html[data-touch-combat] .viewport :is(.medkit-slots kbd,.jet-key-hint) { display: none; }
+html[data-touch-combat] .viewport .player-hud-feedback {
+  top: calc(100% + 3px);
+  bottom: auto;
+  max-width: calc(100vw - 28px);
+  flex-direction: column;
+  gap: 3px;
+}
+html[data-touch-combat] .viewport .medkit-indicator { width: min(146px, 100%); padding: 3px 5px; }
+html[data-touch-combat] .viewport .medkit-readout :is(strong,span) { font-size: 10px; }
+html[data-touch-combat] .viewport .medkit-track { height: 4px; margin-top: 3px; }
+html[data-touch-combat] .viewport .pickup-buffs { gap: 3px; }
+html[data-touch-combat] .viewport .pickup-buffs li { gap: 3px; padding: 2px 4px; font-size: 8px; }
+html[data-touch-combat] .viewport .killfeed {
+  top: 36px;
+  right: 7px;
+  max-width: 23%;
+  font-size: 8px;
+  line-height: 1.3;
+}
+html[data-touch-combat] .viewport .killfeed > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 3px 4px; }
+html[data-touch-combat] .viewport .killfeed > div:nth-child(n + 3) { display: none; }
+html[data-touch-combat] .viewport .interaction-button {
+  min-height: 40px;
+  padding: 5px 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  font-size: 11px;
+  touch-action: manipulation;
+}
+html[data-touch-combat] .viewport #reloadIndicator {
+  inset: auto auto 7px 7px;
+  width: min(122px, 33%);
+  padding: 4px 5px;
+  transform: none;
+}
+html[data-touch-combat] .viewport #reloadIndicator > div:first-child { gap: 4px; font-size: 8px; letter-spacing: 0; }
+html[data-touch-combat] .viewport .grenade-aim-hint { max-width: 95%; padding: 4px 6px; font-size: 9px; }
+
+html:has(.battle-surface[data-expanded]) { overflow: hidden; }
+.battle-surface[data-expanded] { position: fixed; inset: 0; z-index: 1000; }
+html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) {
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  align-items: center;
+  overflow: auto;
+  background: #101821;
+}
+html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) > .viewport { width: 100%; flex: none; }
+html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) > #exitFullscreen {
+  position: absolute;
+  inset: env(safe-area-inset-top) max(5px, env(safe-area-inset-right)) auto auto;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid #7190a2;
+  border-radius: 4px;
+  background: #15222df2;
+  color: #fff4df;
+  font-size: 21px;
+  touch-action: manipulation;
+}
+
+@media (orientation: portrait) {
+  html[data-touch-combat] .viewport .player-hud { max-width: calc(100% - 14px); gap: 4px 5px; }
+  html[data-touch-combat] .viewport .killfeed { top: 82px; }
+  html[data-touch-combat] .battle-surface > .touch-controls {
+    position: static;
+    width: 100%;
+    padding: 8px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    align-items: center;
+    border-top: 1px solid #394f60;
+    background: #151f29;
+  }
+  html[data-touch-combat] .viewport .interaction-button {
+    inset: auto clamp(109px, calc(29% + 11px), 147px) 7px 7px;
+    transform: none;
+    justify-content: center;
+  }
+  html[data-touch-combat] .viewport:has(.interaction-button:not([hidden])) #reloadIndicator { bottom: 52px; }
+  html[data-touch-combat] .viewport .grenade-aim-hint { bottom: 53px; }
+  html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) { padding: max(49px, env(safe-area-inset-top)) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+}
+
+@media (orientation: landscape) {
+  html[data-touch-combat] .battle-surface {
+    --touch-size: clamp(66px, 23dvh, 104px);
+    --touch-action-size: clamp(36px, 11.7dvh, 48px);
+  }
+  html[data-touch-combat] .battle-surface > .viewport {
+    width: min(100%, calc((100vh - 46px) * 16 / 9));
+    width: min(100%, calc((100dvh - 46px) * 16 / 9));
+    margin-inline: auto;
+  }
+  html[data-touch-combat] .battle-surface > .touch-controls {
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  html[data-touch-combat] .viewport .killfeed { top: 91px; }
+  html[data-touch-combat] .viewport .interaction-button {
+    left: calc(50% + (var(--touch-size) - var(--touch-action-width)) / 2);
+    bottom: 8px;
+    width: max-content;
+    max-width: min(230px, calc(100% - var(--touch-size) - var(--touch-action-width) - 36px));
+  }
+  html[data-touch-combat][data-touch-layout="right"] .viewport .interaction-button {
+    left: calc(50% + (var(--touch-action-width) - var(--touch-size)) / 2);
+  }
+  html[data-touch-combat] .viewport #reloadIndicator { inset: 36px auto auto 50%; transform: translateX(-50%); }
+  html[data-touch-combat] .viewport .grenade-aim-hint { bottom: calc(2 * var(--touch-action-size) + 18px); }
+  html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) {
+    --fullscreen-stage-width: min(calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right)), calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9));
+    padding-block: env(safe-area-inset-top) env(safe-area-inset-bottom);
+  }
+  html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) > .viewport { width: var(--fullscreen-stage-width); }
+  html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) .viewport #matchGoal { margin-right: 43px; }
+  html[data-touch-combat] .battle-surface .viewport.match-active.finished { min-height: 0; }
 }
