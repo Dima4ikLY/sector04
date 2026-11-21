@@ -1,5 +1,4 @@
 import {getMapsForMode,maps} from './maps.mjs';
-import {weapons} from './engine.mjs';
 
 const mapsById=new Map(maps.map(map=>[map.id,map]));
 const roomModes=new Map([
@@ -27,69 +26,21 @@ export function visibleRooms(data){
   return rooms.sort((a,b)=>(a.players===a.capacity)-(b.players===b.capacity)||b.players/b.capacity-a.players/a.capacity||a.code.localeCompare(b.code));
 }
 
-export function createRoomBrowser({mount,onJoin,onCreate,onNotice=()=>{}}){
+export function createRoomBrowser({mount,onJoin,onNotice=()=>{}}){
   const node=(tag,className,text)=>{const el=document.createElement(tag);if(className)el.className=className;if(text!==undefined)el.textContent=text;return el;};
   const details=node('details','room-browser'),summary=node('summary','','Открытые комнаты'),body=node('div','room-browser-body');
   const tools=node('div','room-browser-tools'),caption=node('span','','Онлайн на этом сервере'),refreshButton=node('button','room-refresh','Обновить');refreshButton.type='button';refreshButton.setAttribute('aria-label','Обновить список комнат');
-  const createButton=node('button','room-create-toggle','Создать комнату');createButton.type='button';createButton.setAttribute('aria-label','Создать комнату с настройками матча');
   const status=node('p','room-browser-status'),list=node('div','room-browser-list'),empty=node('div','room-browser-empty'),emptyText=node('p','','Сейчас нет открытых комнат. Начни поиск матча или пригласи друзей в свою комнату.');
 
-  const createForm=node('form','room-create-form');
-  const optionsRow=node('div','room-create-options');
-  const modeSelect=node('select','room-create-input');
-  for(const [key,info] of roomModes)modeSelect.append(new Option(info.label,key));
-  modeSelect.value='ffa';
-  const mapSelect=node('select','room-create-input');
-  const fragsSelect=node('select','room-create-input');
-  for(const value of [5,10,15,20,25,30,50])fragsSelect.append(new Option(value+' фрагов',String(value)));
-  fragsSelect.value='15';
-  const timeSelect=node('select','room-create-input');
-  for(const value of [1,2,3,5,7,10,15])timeSelect.append(new Option(value+' мин',String(value)));
-  timeSelect.value='3';
-  const diffSelect=node('select','room-create-input');
-  diffSelect.append(new Option('Боты: лёгкие','easy'));
-  diffSelect.append(new Option('Боты: средние','normal'));
-  diffSelect.append(new Option('Боты: сложные','hard'));
-  diffSelect.value='normal';
-
-  const weaponsBox=node('div','room-create-weapons');
-  const weaponLabels=['AR-04','SG-12','RX-9','P-9','AK-47','MG-60','TITAN-100','EAGLE .50','BR-8','VX-9','SM-11'];
-  weaponLabels.forEach((label,index)=>{
-    const id='room-weapon-'+index;
-    const wrap=node('label','room-weapon-option');
-    const input=document.createElement('input');
-    input.type='checkbox';input.checked=true;input.value=String(index);input.id=id;
-    wrap.append(input,node('span','',label));
-    weaponsBox.append(wrap);
-  });
-  const createSubmit=node('button','secondary','Создать');createSubmit.type='submit';
-  const cancelCreate=node('button','room-cancel','Отмена');cancelCreate.type='button';
-  optionsRow.append(modeSelect,mapSelect,fragsSelect,timeSelect,diffSelect,weaponsBox,createSubmit,cancelCreate);
-  createForm.append(optionsRow);
-  createForm.hidden=true;
-
-  function syncCreateMaps(){mapSelect.replaceChildren(...getMapsForMode(modeSelect.value).map(map=>new Option(map.name,map.id)));}
-  syncCreateMaps();
-  modeSelect.addEventListener('change',syncCreateMaps);
-
-  createForm.addEventListener('submit',event=>{
-    event.preventDefault();
-    const selected=[...weaponsBox.querySelectorAll('input:checked')].map(input=>Number(input.value));
-    const options={frags:Number(fragsSelect.value),timeMinutes:Number(timeSelect.value),weapons:selected.length?selected:[...weapons.keys()],botDifficulty:diffSelect.value};
-    act(()=>onCreate({mode:modeSelect.value,mapId:mapSelect.value,options}));
-  });
-  cancelCreate.addEventListener('click',()=>{createForm.hidden=true;createButton.hidden=false;});
-  createButton.addEventListener('click',()=>{createForm.hidden=false;createButton.hidden=true;syncCreateMaps();});
-
-  tools.append(caption,refreshButton,createButton);
+  tools.append(caption,refreshButton);
   empty.append(emptyText);
   empty.hidden=true;
-  body.append(tools,status,list,empty,createForm);
+  body.append(tools,status,list,empty);
   details.append(summary,body);
   mount.replaceChildren(details);
   let controller=null,revision=0,destroyed=false,playing=false,loading=false,joining=false;
   function buttons(){
-    refreshButton.disabled=loading||playing||joining;createButton.disabled=playing||joining;
+    refreshButton.disabled=loading||playing||joining;
     for(const button of list.querySelectorAll('button'))button.disabled=loading||playing||joining||button.dataset.full==='true';
   }
   async function act(callback){
@@ -126,12 +77,10 @@ export function createRoomBrowser({mount,onJoin,onCreate,onNotice=()=>{}}){
   function toggle(){if(details.open)refresh();else cancel();}
   refreshButton.addEventListener('click',refresh);
   details.addEventListener('toggle',toggle);
-  function openCreate(){details.open=true;createForm.hidden=false;createButton.hidden=true;syncCreateMaps();refresh();}
-  return {openCreate,
+  return {
     refresh,
-    setPlaying(value){playing=!!value;if(playing){details.open=false;cancel();createForm.hidden=true;createButton.hidden=false;}else buttons();},
+    setPlaying(value){playing=!!value;if(playing){details.open=false;cancel();}else buttons();},
     destroy(){destroyed=true;cancel();details.removeEventListener('toggle',toggle);details.remove();}
   };
 }
-
 

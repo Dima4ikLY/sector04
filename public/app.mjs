@@ -108,7 +108,42 @@ export const startup=armory.startup;
 const wardrobe=createWardrobe({armory,isPlaying:()=>!!session,onNotice:toast,use3D,effects:()=>preferences.effects,skinEffects:showSkinEffects,fpsLimit:()=>preferences.fpsLimit});
 const roomCode=$('roomCode');
 function enterByCode(code){roomCode.value=code;return join('join');}
-const roomBrowser=createRoomBrowser({mount:$('roomBrowser'),onJoin:enterByCode,onCreate:createOpts=>join('create',createOpts?.mode,createOpts?.mapId,createOpts?.options),onNotice:toast});
+const roomBrowser=createRoomBrowser({mount:$('roomBrowser'),onJoin:enterByCode,onNotice:toast});
+function syncRoomCreateMaps(){
+  const modeSelect=document.getElementById('roomCreateMode'),mapSelect=document.getElementById('roomCreateMap');
+  if(!modeSelect||!mapSelect)return;
+  mapSelect.replaceChildren(...getMapsForMode(modeSelect.value).map(map=>new Option(map.name,map.id)));
+}
+function openFriendsCreate(){
+  const menu=document.querySelector('.friends-menu');
+  if(menu&&!menu.open)menu.open=true;
+  document.getElementById('friendsHomeActions')?.setAttribute('hidden','');
+  const form=document.getElementById('roomCreateForm');
+  if(form)form.hidden=false;
+  syncRoomCreateMaps();
+}
+function initRoomCreateForm(){
+  const form=document.getElementById('roomCreateForm');
+  if(!form)return;
+  const weaponsBox=document.getElementById('roomCreateWeapons');
+  const labels=['AR-04','SG-12','RX-9','P-9','AK-47','MG-60','TITAN-100','EAGLE .50','BR-8','VX-9','SM-11'];
+  labels.forEach((label,index)=>{
+    const wrap=document.createElement('label');wrap.className='room-weapon-option';
+    const input=document.createElement('input');input.type='checkbox';input.checked=true;input.value=String(index);
+    const span=document.createElement('span');span.textContent=label;
+    wrap.append(input,span);weaponsBox.append(wrap);
+  });
+  syncRoomCreateMaps();
+  document.getElementById('roomCreateMode').addEventListener('change',syncRoomCreateMaps);
+  document.getElementById('roomCreateCancel').addEventListener('click',()=>{form.hidden=true;document.getElementById('friendsHomeActions')?.removeAttribute('hidden');});
+  form.addEventListener('submit',event=>{
+    event.preventDefault();
+    const selected=[...weaponsBox.querySelectorAll('input:checked')].map(input=>Number(input.value));
+    const options={frags:Number(document.getElementById('roomCreateFrags').value),timeMinutes:Number(document.getElementById('roomCreateTime').value),weapons:selected.length?selected:[...weapons.keys()],botDifficulty:document.getElementById('roomCreateDiff').value};
+    join('create',document.getElementById('roomCreateMode').value,document.getElementById('roomCreateMap').value,options);
+  });
+}
+initRoomCreateForm();
 const invited=new URLSearchParams(location.search).get('room')?.trim();
 let incomingCode=/^[0-9a-f]{6}$/i.test(invited??'')?invited.toUpperCase():'';
 if(incomingCode){
@@ -549,7 +584,7 @@ async function leave(){
   $('killfeed').replaceChildren();$('scoreTitle').textContent='ПОСЛЕДНИЙ БОЙ';$('connection').textContent='ПРЕВЬЮ КАРТЫ';showMapPreview(lobbyMap(selectedMatchMode));
   const pending=(async()=>{try{const result=await api('leave',{token:old.token});if(!session)armory.setProfile(result.profile);}catch{}})();leaving=pending;await pending;if(leaving===pending)leaving=null;
 }
-$('quick').onclick=()=>join('quick');$('train').onclick=()=>join('train');$('range').onclick=()=>join('range');$('create').onclick=()=>roomBrowser.openCreate();$('leave').onclick=leave;
+$('quick').onclick=()=>join('quick');$('train').onclick=()=>join('train');$('range').onclick=()=>join('range');$('create').onclick=()=>openFriendsCreate();$('leave').onclick=leave;
 $('duelPrivate').onclick=()=>join('create','1v1');
 $('queueCancel').onclick=leave;
 $('queueInvite').onclick=()=>copyInvitation($('queueInviteUrl'));
@@ -1356,6 +1391,8 @@ async function initVK(){
   }
 }
 initVK();
+
+
 
 
 
