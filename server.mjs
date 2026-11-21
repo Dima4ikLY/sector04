@@ -15,6 +15,19 @@ const mapBackgrounds=new Map(maps.filter(map=>map.backdrop).map(({id})=>[`/art/b
 const sharePreview='/art/brand/vk-link-preview-1200x630.jpg';
 const gameBanner='/art/brand/sector04-game-1920x1080.jpg';
 const hostAuthority=/^(?:\[[a-f\d:.]+\]|[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?(?:\.[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?)*\.?)(?::\d{1,5})?$/i;
+
+const roomOptionLimits={frags:[5,10,15,20,25,30,50],timeMinutes:[1,2,3,5,7,10,15],maxWeapons:11};
+function sanitizeRoomOptions(options){
+  if(typeof options!=='object'||options===null)return {};
+  const out={};
+  if(roomOptionLimits.frags.includes(options.frags))out.frags=options.frags;
+  if(roomOptionLimits.timeMinutes.includes(options.timeMinutes))out.timeMinutes=options.timeMinutes;
+  if(Array.isArray(options.weapons)){
+    const allowed=[...new Set(options.weapons.filter(index=>Number.isInteger(index)&&index>=0&&index<roomOptionLimits.maxWeapons))].sort((a,b)=>a-b);
+    if(allowed.length)out.weapons=allowed;
+  }
+  return out;
+}
 const matchModes=new Map([
   ['ffa',{capacity:6,teamSize:0}],
   ['1v1',{capacity:2,teamSize:1,bots:false}],
@@ -295,6 +308,7 @@ export function createArenaServer({
           const matchMode=b.matchMode===undefined?'ffa':b.matchMode;
           const privateMatch=mode==='create'&&matchMode==='1v1';
           const matchConfig=mode==='quick'||mode==='create'?matchModes.get(matchMode):undefined;
+          const roomOptions=mode==='create'?sanitizeRoomOptions(b.options):{};
           if(mode==='quick'&&!matchConfig)throw new EconomyError('Режим матча не найден',400);
           const now=performance.now();
           let room;
@@ -329,14 +343,15 @@ export function createArenaServer({
             if(rooms.size>=60)return json(res,503,{error:'Слишком много комнат'});
             let code;
             do{code=randomUUID().slice(0,6).toUpperCase();}while(rooms.has(code));
-            const world=createWorld(mapId,{range,coop,teamSize:matchConfig?.teamSize??0});
+            const world=createWorld(mapId,{range,coop,teamSize:matchConfig?.teamSize??0,timeSeconds:roomOptions.timeMinutes*60});
             if(!range&&!coop)attachEconomy(world);
             room={code,training:mode==='train',world};
             if(matchConfig){
               const waitMs=matchConfig.bots===false?null:matchmakingWaitMs;
               if(waitMs!==null)room.searchEndsAt=now+waitMs;
               world.match={mode:matchMode,phase:'waiting',capacity:matchConfig.capacity,
-                remaining:waitMs===null?null:Math.ceil(waitMs/1000),...(privateMatch?{private:true}:{})};
+                remaining:waitMs===null?null:Math.ceil(waitMs/1000),...(privateMatch?{private:true}:{}),
+                ...(roomOptions.frags?{frags:roomOptions.frags}:{}),...(roomOptions.weapons?{weapons:roomOptions.weapons}:{})};
             }
             rooms.set(code,room);
           }
@@ -355,6 +370,13 @@ export function createArenaServer({
           player.helmetStyle=helmet?.id;
           player.appearance=profile.appearance;
           player.ownedWeapons=range?[...weapons.keys()]:[...account.owned];
+          if(!range&&!room.world.coop&&Array.isArray(room.world.match?.weapons)){
+            const allowed=room.world.match.weapons;
+            if(!allowed.includes(player.weapon))player.weapon=allowed[0];
+            player.ownedWeapons=player.ownedWeapons.filter(index=>allowed.includes(index));
+            if(!player.ownedWeapons.length)player.ownedWeapons=[allowed[0]];
+            player.ammo=weapons[player.weapon].mag;
+          }
           player.inventoryManaged=!range;
           if(!range&&!room.world.coop)player.grenades=account.grenades;
           player.medkits={...(range||room.world.coop?START_MEDKITS:account.medkits)};
@@ -465,5 +487,7 @@ export function createArenaServer({
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const port=Number(process.env.PORT||4320);createArenaServer().listen(port,process.env.HOST||'0.0.0.0',()=>console.log(`SECTOR 04 → http://localhost:${port}`));
 }
+
+
 
 

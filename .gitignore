@@ -1,0 +1,10 @@
+node_modules/
+test-roomcfg.mjs
+test-time.mjs
+test-profiles.tmp.json
+server.mjs.bak-roomcfg
+public/engine.mjs.bak-roomcfg
+public/app.mjs.bak-roomcfg
+public/rooms.mjs.bak-roomcfg
+do_push.ps1
+do_push_cmd.bat

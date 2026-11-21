@@ -1,4 +1,5 @@
 import {getMapsForMode,maps} from './maps.mjs';
+import {weapons} from './engine.mjs';
 
 const mapsById=new Map(maps.map(map=>[map.id,map]));
 const roomModes=new Map([
@@ -70,10 +71,42 @@ export function createRoomBrowser({mount,onJoin,onCreate,onNotice=()=>{}}){
   }
   function cancel(){revision++;controller?.abort();controller=null;loading=false;body.removeAttribute('aria-busy');buttons();}
   function toggle(){if(details.open)refresh();else cancel();}
-  refreshButton.addEventListener('click',refresh);createButton.addEventListener('click',()=>act(onCreate));details.addEventListener('toggle',toggle);
+  refreshButton.addEventListener('click',refresh);const createForm=node('form','room-create-form');
+const optionsRow=node('div','room-create-options');
+const modeSelect=node('select','room-create-input');
+for(const [key,info] of roomModes)modeSelect.append(new Option(info.label,key));
+modeSelect.value='ffa';
+const mapSelect=node('select','room-create-input');
+const fragsSelect=node('select','room-create-input');
+for(const value of [5,10,15,20,25,30,50])fragsSelect.append(new Option(value+' фрагов',String(value)));
+fragsSelect.value='15';
+const timeSelect=node('select','room-create-input');
+for(const value of [1,2,3,5,7,10,15])timeSelect.append(new Option(value+' мин',String(value)));
+timeSelect.value='3';
+const weaponsBox=node('div','room-create-weapons');
+const weaponLabels=['AR-04','SG-12','RX-9','P-9','AK-47','MG-60','TITAN-100','EAGLE .50','BR-8','VX-9','SM-11'];
+weaponLabels.forEach((label,index)=>{const id='room-weapon-'+index;const wrap=node('label','room-weapon-option');const input=document.createElement('input');input.type='checkbox';input.checked=true;input.value=String(index);input.id=id;wrap.append(input,node('span','',label));weaponsBox.append(wrap);});
+const createSubmit=node('button','secondary','Создать');
+const cancelCreate=node('button','room-cancel','Отмена');
+optionsRow.append(modeSelect,mapSelect,fragsSelect,timeSelect,weaponsBox,createSubmit,cancelCreate);
+createForm.append(optionsRow);createForm.hidden=true;createButton.hidden=true;
+function syncCreateMaps(){mapSelect.replaceChildren(...getMapsForMode(modeSelect.value).map(map=>new Option(map.name,map.id)));}
+syncCreateMaps();
+modeSelect.addEventListener('change',syncCreateMaps);
+createForm.addEventListener('submit',event=>{
+  event.preventDefault();
+  const weapons=[...weaponsBox.querySelectorAll('input:checked')].map(input=>Number(input.value));
+  const options={frags:Number(fragsSelect.value),timeMinutes:Number(timeSelect.value),weapons:weapons.length?weapons:[...weapons.keys()]};
+  act(()=>onCreate({mode:modeSelect.value,mapId:mapSelect.value,options}));
+});
+cancelCreate.type='button';
+cancelCreate.addEventListener('click',()=>{createForm.hidden=true;createButton.hidden=false;});
+createButton.addEventListener('click',()=>{createForm.hidden=false;createButton.hidden=true;});details.addEventListener('toggle',toggle);
   return {
     refresh,
     setPlaying(value){playing=!!value;if(playing){details.open=false;cancel();}else buttons();},
     destroy(){destroyed=true;cancel();details.removeEventListener('toggle',toggle);details.remove();}
   };
 }
+
+

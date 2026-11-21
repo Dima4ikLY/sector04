@@ -437,7 +437,7 @@ function syncMatchQueue(initial=false){
   }
   return waiting;
 }
-async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,mapId=lobbyMap(matchMode??'ffa')){
+async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,mapId=lobbyMap(matchMode??'ffa'),roomOptions=undefined){
   if(joining||session)return;joining=true;clearControls();$('error').textContent='';document.querySelectorAll('#lobby button').forEach(b=>b.disabled=true);
   syncMapChoices(selectedMap);
   battleAudioReady=audio.unlock().catch(()=>{});
@@ -453,7 +453,7 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
     if(leaving)await leaving;
     await armory.ready;
     const name=$('nickname').value.trim()||'Боец_04';
-    const next=await api('join',{mode,matchMode,name,mapId,room:roomCode.value.trim().toUpperCase(),accountToken:armory.token});
+    const next=await api('join',{mode,matchMode,name,mapId,room:roomCode.value.trim().toUpperCase(),accountToken:armory.token,...(roomOptions&&mode==='create'?{options:roomOptions}:{})});
     if(next.room===incomingCode)incomingCode='';
     next.weapon??=START_WEAPON;
     next.weaponSlots=next.range?[...weapons.keys()]:next.profile.owned;
@@ -1356,3 +1356,5 @@ async function initVK(){
   }
 }
 initVK();
+
+

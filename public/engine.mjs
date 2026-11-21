@@ -59,13 +59,13 @@ export const weapons = [
 const colors = ['#bcf466','#fb8b51','#7bbaff','#d297ff','#ffd76d','#ff789d'];
 const rangeDistances = [0,180,320,480];
 export const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
-export function createWorld(mapId='foundry',{range=false,coop=false,teamSize=0}={}) {
+export function createWorld(mapId='foundry',{range=false,coop=false,teamSize=0,timeSeconds}={}) {
   const map=getMap(mapId);
   const mission=coop?{phase:'waiting',wave:0,totalWaves:COOP_WAVES,enemiesLeft:0,countdown:0,hostId:null,defeated:0}:null;
   const pickups=range?[]:getMapPickups(map)
     .filter(pickup=>Object.hasOwn(medkits,pickup.kind))
     .map(placement=>({...placement,remaining:0}));
-  const world={mapId:map.id,range,coop:mission,mechanisms:createMechanisms(map),pickups,time:ROUND,players:[],bullets:[],grenades:[],effects:[],audioEvents:[],combatEvents:[],feed:[],ended:false,serial:0};
+  const world={mapId:map.id,range,coop:mission,mechanisms:createMechanisms(map),pickups,time:Number.isFinite(timeSeconds)&&timeSeconds>0?timeSeconds:ROUND,players:[],bullets:[],grenades:[],effects:[],audioEvents:[],combatEvents:[],feed:[],ended:false,serial:0};
   if(!range)mapBuffs.set(world,{locations:getMapBuffSpawns(map),nextAt:ROUND-BUFF_SPAWN.initialDelay,active:null,previous:null});
   if(teamSize===1||teamSize===2||teamSize===3)world.teams={size:teamSize,scores:[0,0],winner:null};
   return world;
@@ -770,7 +770,9 @@ export function step(world,dt) {
       if(mechanism&&!activated.has(mechanism.state.id)&&triggerMechanism(mechanism,p,world.players,playerHalfWidth))activated.add(mechanism.state.id);
     }
     p.shield=Math.max(0,p.shield-dt);p.cool-=dt;p.grenadeCool-=dt;
-    if(Number.isInteger(i.weapon)&&i.weapon>=0&&i.weapon<weapons.length&&i.weapon!==p.weapon&&(!p.ownedWeapons||p.ownedWeapons.includes(i.weapon))){
+    const allowedWeapons=world.match?.weapons;
+  const weaponAllowed=index=>!Array.isArray(allowedWeapons)||allowedWeapons.includes(index);
+  if(Number.isInteger(i.weapon)&&i.weapon>=0&&i.weapon<weapons.length&&i.weapon!==p.weapon&&weaponAllowed(i.weapon)&&(!p.ownedWeapons||p.ownedWeapons.includes(i.weapon))){
       const fromWeapon=p.weapon;
       p.weapon=i.weapon;
       p.weaponAt=world.time;
@@ -935,7 +937,11 @@ export function step(world,dt) {
   world.grenades=world.grenades.filter(g=>g.life>0);
   for(const e of world.effects)e.life-=dt;world.effects=world.effects.filter(e=>e.life>0);
   if(world.coop)updateCoop(world,dt);
-  else if(world.time<=0||(!world.range&&(world.teams?.scores.some(score=>score>=TARGET)
-    ??world.players.some(player=>player.kills>=TARGET))))finishRound(world);
+  else if(world.time<=0||(!world.range&&(world.teams?.scores.some(score=>score>=(world.match?.frags??TARGET))
+    ??world.players.some(player=>player.kills>=(world.match?.frags??TARGET)))))finishRound(world);
   if(!world.ended)advanceMedkits(world,dt);
 }
+
+
+
+
