@@ -4,7 +4,7 @@ import {createArmory} from './shop.mjs';
 import {START_WEAPON,armorForEquipment,helmetForEquipment,ranks,rankIndex,rankUnlocks,rankUnlocksBetween} from './catalog.mjs';
 import {getMap,getMapsForMode} from './maps.mjs';
 import {AimCamera,sampleBlastShake} from './camera.mjs';
-import {buildScenery,drawMapMechanisms,drawMapCovers,drawTidalBridge} from './scenery.mjs';
+import {buildScenery,drawMapMechanisms,drawMapCovers,drawTidalBridge,drawTidalWater} from './scenery.mjs';
 import {isConcealedFrom} from './covers.mjs';
 import {teamSpawnColors as teamColors,teamFightColors} from './map-detail.mjs';
 import {mapWithMechanisms,nearbyMechanism} from './map-interactives.mjs';
@@ -1365,7 +1365,10 @@ function render(t){
   if(bg3D!==draw3D)bg=scenery(map);
   drawArenaBackdrop(map,viewX,viewY,baseX,baseY,zoom);
   ctx.save();ctx.scale(zoom,zoom);ctx.translate(-viewX,-viewY);
-  if(map.tidal)drawTidalBridge(ctx,map,scene.bridgeHealth);
+  if(map.tidal){
+    if(preferences.effects&&!reducedMotion.matches)drawTidalWater(ctx,map,{time:t*.001,view,background:bg});
+    drawTidalBridge(ctx,map,scene.bridgeHealth);
+  }
   drawAtmosphere(map,t);
   if(!draw3D)drawMapMechanisms(ctx,map,scene.mechanisms);
   const spawnOpacity=new Map();

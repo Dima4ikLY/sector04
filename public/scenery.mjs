@@ -452,56 +452,106 @@ function drawTidalIllustration(ctx,image){
 }
 
 function drawTidalTerrain(ctx,map,backdrop){
-  const {water,jets,slope}=map.tidal;
+  const {water}=map.tidal;
   if(backdrop){
     drawTidalIllustration(ctx,backdrop);
-    rect(ctx,0,0,map.width,map.height,'#081d2a18');
-  }else{
-    gradient(ctx,0,0,map.width,map.height,[[0,'#142530'],[.64,'#24505a'],[1,'#10282f']]);
-    for(let x=160;x<map.width;x+=320){
-      ctx.fillStyle='#192e3870';
-      ctx.beginPath();ctx.moveTo(x-110,0);ctx.lineTo(x+100,0);
-      ctx.lineTo(x+36,330+(x%3)*66);ctx.closePath();ctx.fill();
+    return;
+  }
+  gradient(ctx,0,0,map.width,map.height,[[0,'#142530'],[.64,'#24505a'],[1,'#10282f']]);
+  gradient(ctx,water.x,water.y,water.w,water.h,[[0,'#327b83'],[1,'#103d48']]);
+}
+
+// These positions follow the painted waterfall mouths, not the lift hitboxes.
+const tidalFallMouths=[{x:784,y:727,width:52},{x:2416,y:327,width:82}];
+
+function drawTidalFalls(ctx,surface,time,view){
+  const right=view.x+view.width,bottom=view.y+view.height;
+  ctx.save();
+  ctx.lineCap='round';
+  for(const {x,y,width} of tidalFallMouths){
+    if(x+150<view.x||x-150>right||y>bottom||surface+65<view.y)continue;
+    const height=surface-y;
+    for(let i=0;i<25;i++){
+      const phase=(time*(.62+i%5*.04)+i*.618)%1;
+      const yy=y+phase*height;
+      const spread=(i%13-6)/6;
+      const xx=x+spread*width*.47+Math.sin(phase*8+i)*4;
+      const length=16+i%7*5;
+      ctx.globalAlpha=Math.sin(phase*Math.PI)*(.16+i%4*.08);
+      line(ctx,xx,yy,xx+spread*2,Math.min(surface,yy+length),i%3?'#bdffff':'#ffffff',1.1+i%4*.63);
+    }
+    for(let i=0;i<19;i++){
+      const phase=(time*(1.3+i%4*.13)+i*.618)%1;
+      const spread=(i%9-4)/4;
+      const xx=x+spread*(12+phase*75);
+      const yy=surface-Math.sin(phase*Math.PI)*(10+i%6*7);
+      ctx.globalAlpha=(1-phase)*(.20+i%4*.11);
+      ctx.fillStyle=i%3?'#c5fffc':'#ffffff';
+      ctx.beginPath();ctx.ellipse(xx,yy,1.7+i%3,1+i%3,0,0,Math.PI*2);ctx.fill();
+    }
+    for(let i=0;i<3;i++){
+      const phase=(time*.75+i/3)%1;
+      ctx.globalAlpha=(1-phase)*.38;
+      ctx.strokeStyle='#c9ffef';ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.ellipse(x,surface+2+i*4,16+phase*100,2+phase*8,0,0,Math.PI*2);
+      ctx.stroke();
     }
   }
-  rect(ctx,water.x,water.y,water.w,water.h,backdrop?'#00788338':'#0d707d');
-  if(!backdrop)for(let y=water.y+32;y<water.y+water.h;y+=32)
-    line(ctx,water.x,y,water.x+water.w,y,'#69d8da27',2);
-  line(ctx,water.x,water.y,water.x+water.w,water.y,backdrop?'#b4f4edb0':'#91e8e6',4);
-  for(const jet of jets){
-    rect(ctx,jet.x,jet.y,jet.w,jet.h,'#87edfa35');
-    for(let y=jet.y+24;y<jet.y+jet.h-10;y+=64){
-      const x=jet.x+jet.w/2;
-      line(ctx,x-14,y+10,x,y-6,'#98f8f5a0',3);
-      line(ctx,x,y-6,x+14,y+10,'#98f8f5a0',3);
+  ctx.restore();
+}
+
+export function drawTidalWater(ctx,map,{time,view,background}){
+  const {water}=map.tidal;
+  const left=Math.max(water.x,view.x-5),right=Math.min(water.x+water.w,view.x+view.width+5);
+  if(left<right&&view.y<water.y+water.h&&view.y+view.height>water.y){
+    ctx.save();
+    // Do not refract the banks or the rock ceiling over the tunnel.
+    ctx.beginPath();ctx.rect(water.x,water.y,water.w,water.h);
+    for(const solid of map.solids){
+      const x=Math.max(water.x,solid.x),y=Math.max(water.y,solid.y);
+      const w=Math.min(water.x+water.w,solid.x+solid.w)-x,h=Math.min(water.y+water.h,solid.y+solid.h)-y;
+      if(w>0&&h>0)ctx.rect(x,y,w,h);
     }
-  }
-  for(const surface of [...map.solids,...map.platforms]){
-    const {x,y,w,h,kind}=surface;
-    const solid=map.solids.includes(surface);
-    const fill=kind==='crate'?'#725e47':backdrop?(solid?'#10222c80':'#28454ad0'):'#324955';
-    rect(ctx,x,y,w,h,fill);
-    rect(ctx,x,y,w,4,kind==='crate'?'#e6b375':backdrop?'#c8ddcb':'#92b7b8');
-    if(!backdrop&&kind!=='crate'&&h>40){
-      for(let row=y+40;row<y+h;row+=40)line(ctx,x,row,x+w,row,'#172c35',2);
+    ctx.clip('evenodd');
+    if(background){
+      const scale=background.worldScale||1;
+      for(let row=0;row<12;row++){
+        const y=water.y+4+row*6;
+        const shift=Math.sin(time*4+row*.77)*(2+(1-row/12)*3);
+        ctx.globalAlpha=(1-row/12)*.68;
+        ctx.drawImage(background,(left+shift)*scale,y*scale,(right-left)*scale,6*scale,left,y,right-left,6);
+      }
     }
+    ctx.lineCap='round';
+    for(let i=0;i<42;i++){
+      const x=water.x+(((i*.618+time*(i%2?.019:.012))%1)*water.w);
+      const y=water.y+3+(i*11)%66+Math.sin(time*3+i)*2;
+      if(x<left-90||x>right)continue;
+      const length=12+i%7*8;
+      ctx.globalAlpha=(.22+.18*Math.sin(time*3+i*2))*(1-(y-water.y)/88);
+      const glint=ctx.createLinearGradient(x,y,x+length,y);
+      glint.addColorStop(0,'#d1ffed00');glint.addColorStop(.48,'#d1ffed');glint.addColorStop(1,'#d1ffed00');
+      line(ctx,x,y,x+length,y,glint,1.2+i%3*.35);
+    }
+    ctx.restore();
   }
-  ctx.beginPath();
-  for(const [index,[x,y]] of slope.vertices.entries())index?ctx.lineTo(x,y):ctx.moveTo(x,y);
-  ctx.closePath();ctx.fillStyle=backdrop?'#3e6969cc':'#46777c';ctx.fill();
-  const [[ax,ay],[bx,by]]=slope.vertices;
-  line(ctx,ax,ay,bx,by,'#a3d9d5',4);
-  line(ctx,960,686,2240,686,'#a588643b',3);
+  drawTidalFalls(ctx,water.y,time,view);
 }
 
 export function drawTidalBridge(ctx,map,health){
-  for(const segment of map.tidal.bridge){
+  for(const [sectionIndex,segment] of map.tidal.bridge.entries()){
     const hp=health?.[segment.id]??segment.hp;
     if(!hp)continue;
     const {x,y,w,h}=segment;
-    rect(ctx,x+1,y,w-2,h,hp<30?'#875646':'#66533f');
-    rect(ctx,x+1,y,w-2,4,hp<30?'#ec9970':'#e8be87');
-    for(let plank=x+16;plank<x+w;plank+=16)line(ctx,plank,y+4,plank,y+h,'#242630',2);
+    const wood=hp<30?['#694534','#76513a','#593b2c']:['#82684a','#6d543b','#967858'];
+    rect(ctx,x+1,y+9,w-2,h-12,'#312b28');
+    for(let i=0;i<8;i++){
+      const left=x+i*(w/8)+1, width=w/8-2, depth=12+(i*11+x)%8;
+      rect(ctx,left,y,width,depth,wood[(i+sectionIndex)%3]);
+      line(ctx,left+1,y+1,left+width-1,y+1,'#d4bd8a90',1.5);
+      line(ctx,left+1,y+5+i%4,left+width-2,y+5+i%4,'#33251d72',1);
+    }
   }
 }
 
