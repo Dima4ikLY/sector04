@@ -9,6 +9,7 @@ import {isConcealedFrom} from './covers.mjs';
 import {teamSpawnColors as teamColors,teamFightColors} from './map-detail.mjs';
 import {mapWithMechanisms,nearbyMechanism} from './map-interactives.mjs';
 import {WeaponAudio} from './audio.mjs';
+import {BattleScore} from './battle-score.mjs';
 import {drawCharacter,drawCharacterLabel,characterStyles,characterPalettes} from './characters.mjs';
 import {createWardrobe} from './wardrobe.mjs';
 import {createCharacterScene} from './models3d.mjs';
@@ -60,6 +61,7 @@ const shouldDrawArena=createFrameLimiter();
 const motion=new SnapshotBuffer();
 const arenaSkinEffects=createSkinEffects();
 const camera=new AimCamera(),audio=new WeaponAudio();
+const battleScore=new BattleScore();
 let actors3D=preferences.renderer==='3d'?createCharacterScene($('actors3d'),{report:true}):null;
 const feedback=new CombatFeedback();
 const keys=new Set(),touchKeys=new Set();
@@ -83,12 +85,16 @@ const buffHud=$('buffHud'),buffChips=[...buffHud.children];
 for(const chip of buffChips)chip.style.setProperty('--buff-color',PICKUP_TYPES[chip.dataset.buff].color);
 function use3D(){return preferences.renderer==='3d'&&!!actors3D?.enabled;}
 function showSkinEffects(){return preferences.effects&&!reducedMotion.matches;}
+function syncBattleMusicVolume(){
+  battleScore.setVolume(audio.enabled&&!document.hidden?preferences.volume*preferences.musicVolume/10000:0);
+}
 function applySettings(value){
   const bindingChanged=Object.keys(value.bindings).some(action=>preferences.bindings[action]!==value.bindings[action]);
   if(bindingChanged)clearControls();
   if(value.fpsLimit!==preferences.fpsLimit){fpsTime=null;fpsFrames=0;}
   preferences=value;
   audio.setVolume(value.volume/100);
+  syncBattleMusicVolume();
   if(value.renderer==='3d'&&!actors3D)actors3D=createCharacterScene($('actors3d'),{report:true});
   $('actors3d').style.visibility=use3D()?'visible':'hidden';
   document.documentElement.dataset.characterRenderer=document.documentElement.dataset.worldRenderer=use3D()?'3d':'2d';
@@ -359,6 +365,14 @@ $('rangeWeapon').addEventListener('change',event=>{
 function clearControls(){keys.clear();touchKeys.clear();slideGesture.reset();grenadePending=false;medkitPending=null;proneRequested=false;requestedInteraction=0;if(touchJoystick)resetJoystick();}
 const waitingForMatch=()=>world.match?.phase==='waiting';
 const battleLocked=()=>waitingForMatch()||!!world.countdown;
+function syncBattleMusic(){
+  if(!session||session.range||world.ended||battleLocked()||world.coop?.phase==='waiting'||!world.players.some(p=>p.id===session.id)){
+    battleScore.stop();
+    return;
+  }
+  if(audio.enabled&&audio.context?.state==='running')void battleScore.start(audio.context).catch(()=>{});
+}
+document.addEventListener('visibilitychange',syncBattleMusicVolume);
 function prepareBattleIntro(mapId,mode){
   if(battleIntroEntry?.mapId===mapId&&battleIntroEntry.mode===mode)return;
   const map=getMap(mapId);
@@ -511,6 +525,11 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
   document.documentElement.classList.add('arena-visible');
   syncMapChoices(selectedMap);
   battleAudioReady=audio.unlock().catch(()=>{});
+  void battleAudioReady.then(()=>{
+    if(mode!=='range'&&audio.enabled&&preferences.musicVolume>0&&preferences.volume>0&&audio.context){
+      return battleScore.preload(audio.context);
+    }
+  }).catch(()=>{});
   const showJoining=mode==='quick'||(mode==='create'&&matchMode==='1v1');
   if(showJoining)showQueueConnection(matchMode,mapId);
   try{
@@ -589,6 +608,7 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
         audio.consume(world.audioEvents,listener,world.mapId,world.time);
         audio.updateSlides(world.ended?[]:world.players,listener,world.mapId);
         updateHud();
+        syncBattleMusic();
       }catch{}
     };
     stream.onerror=()=>{
@@ -610,6 +630,7 @@ async function leave(){
   if(!session)return;const old=session;session=null;stream?.close();stream=null;clearControls();motion.reset();canvas.style.cursor='default';
   document.documentElement.classList.remove('arena-visible');
   audio.stopSlides();
+  battleScore.stop();
   clearBattleIntro();
   resetResultOverlay();
   startingCoop=false;
@@ -683,7 +704,16 @@ $('invite').onclick=()=>copyInvitation(waitingForMatch()&&session?.match?.mode==
 $('help').onclick=()=>{clearControls();$('helpDialog').showModal();};$('closeHelp').onclick=()=>$('helpDialog').close();
 $('helpDialog').addEventListener('click',e=>{if(e.target===$('helpDialog'))$('helpDialog').close();});
 $('fullscreen').onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await $('viewport').requestFullscreen();}catch{toast('Полноэкранный режим недоступен в этом браузере');}};
-$('sound').onclick=async()=>{try{const enabled=await audio.toggle();$('sound').innerHTML=enabled?'♫ <span>Звук вкл.</span>':'♫ <span>Звук выкл.</span>';$('sound').setAttribute('aria-label',enabled?'Выключить звук':'Включить звук');$('sound').title=enabled?'Выключить звук':'Включить звук';}catch{toast('Браузер не смог включить звук. Попробуйте ещё раз.');}};
+$('sound').onclick=async()=>{
+  try{
+    const enabled=await audio.toggle();
+    syncBattleMusicVolume();
+    syncBattleMusic();
+    $('sound').innerHTML=enabled?'♫ <span>Звук вкл.</span>':'♫ <span>Звук выкл.</span>';
+    const label=enabled?'Выключить звук':'Включить звук';
+    $('sound').setAttribute('aria-label',label);$('sound').title=label;
+  }catch{toast('Браузер не смог включить звук. Попробуйте ещё раз.');}
+};
 function isEditing(){return ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)||!!document.querySelector('dialog[open]');}
 function canControl(){
   return !!session&&!isEditing()&&!document.hidden&&!world.ended
@@ -850,7 +880,10 @@ setInterval(async()=>{
   }catch(error){if(session===current&&error.status===401){toast(error.message);leave();}}
   finally{inputPending=false;}
 },50);
-window.addEventListener('pagehide',()=>{if(session)navigator.sendBeacon('/api/leave',new Blob([JSON.stringify({token:session.token})],{type:'application/json'}));});
+window.addEventListener('pagehide',()=>{
+  battleScore.stop();
+  if(session)navigator.sendBeacon('/api/leave',new Blob([JSON.stringify({token:session.token})],{type:'application/json'}));
+});
 const teamScoreText=scores=>`${teamNames[0]} ${scores[0]} : ${scores[1]} ${teamNames[1]}`;
 const duelScoreText=(scores,team)=>`Ты ${scores[team]} : ${scores[1-team]} Соперник`;
 function playerScoreRow(player,index,viewerId){
@@ -1224,11 +1257,13 @@ function drawCombatEffects(scene,events,map,view){
 function drawArenaBackdrop(map,viewX,viewY,baseX,baseY,zoom){
   const width=W/zoom,height=H/zoom,scale=bg.worldScale||1;
   ctx.clearRect(0,0,W,H);
+  if(map.tidal){ctx.save();ctx.imageSmoothingQuality='high';}
   if(viewX<0||viewY<0||viewX+width>map.width||viewY+height>map.height){
     // Back the shifted image with the base view where a map edge is exposed.
     ctx.drawImage(bg,baseX*scale,baseY*scale,width*scale,height*scale,0,0,W,H);
   }
   ctx.drawImage(bg,viewX*scale,viewY*scale,width*scale,height*scale,0,0,W,H);
+  if(map.tidal)ctx.restore();
 }
 function drawAtmosphere(map,time){
   if(!preferences.effects||reducedMotion.matches)return;

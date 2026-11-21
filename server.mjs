@@ -475,7 +475,8 @@ export function createArenaServer({
         [sharePreview]:sharePreview.slice(1),[gameBanner]:gameBanner.slice(1),
         '/art/brand/vk-community-cover-1920x768.jpg':'art/brand/vk-community-cover-1920x768.jpg',
         '/art/brand/vk-story-1080x1920.jpg':'art/brand/vk-story-1080x1920.jpg','/startup.mjs':'startup.mjs',
-        '/battle-tips.mjs':'battle-tips.mjs','/battle-cues.mjs':'battle-cues.mjs'
+        '/battle-tips.mjs':'battle-tips.mjs','/battle-cues.mjs':'battle-cues.mjs',
+        '/battle-score.mjs':'battle-score.mjs','/tidal-art.mjs':'tidal-art.mjs'
       });
       Object.assign(files,{'/practice-guide.mjs':'practice-guide.mjs','/practice-guide.css':'practice-guide.css','/emblems.css':'emblems.css','/keybinds.mjs':'keybinds.mjs','/history.mjs':'history.mjs','/history.css':'history.css','/combat.mjs':'combat.mjs','/geometry.mjs':'geometry.mjs','/rooms.mjs':'rooms.mjs','/rooms.css':'rooms.css','/settings.mjs':'settings.mjs','/settings.css':'settings.css','/improvements.css':'improvements.css','/grenade.mjs':'grenade.mjs','/world3d.mjs':'world3d.mjs','/gait.mjs':'gait.mjs','/models3d.mjs':'models3d.mjs','/map-detail.mjs':'map-detail.mjs','/vendor/three.module.min.js':'vendor/three.module.min.js','/vendor/three.core.min.js':'vendor/three.core.min.js'});
       Object.assign(files,{'/operations.css':'operations.css','/operations-panels.css':'operations-panels.css','/actor-motion.mjs':'actor-motion.mjs','/death-motion.mjs':'death-motion.mjs','/arena-effects.mjs':'arena-effects.mjs',

@@ -1,6 +1,7 @@
 import {arenaLooks,gradient,haze,lamp,line,mechanismAppearance,mechanismLights,pipe,platformDetails,rearDeckSupports,rect,rng,surfaceGrain,teamSpawnBeacon,teamSpawnColors} from './map-detail.mjs';
 import {VIEW_W} from './maps.mjs';
 import {coverAt,getMapCovers} from './covers.mjs';
+import {projectTidalArt} from './tidal-art.mjs';
 
 const atlasPanels = {foundry: [0, 0], canyon: [1, 0], harbor: [0, 1], dungeon: [1, 1]};
 const photoFocusY={foundry:.54,canyon:.4,harbor:.72,dungeon:.38,spillway:.86,observatory:.48};
@@ -417,46 +418,8 @@ export function drawMapCovers(ctx,map,{viewer=null,view=null}={}){
   }
 }
 
-// Keep the supplied illustration intact. In the game layer the deck is replaced
-// with open cavern behind the ten separately rendered, destructible sections.
-function drawTidalIllustration(ctx,image){
-  const art=document.createElement('canvas');
-  art.width=1774;art.height=887;
-  const layer=art.getContext('2d');
-  layer.drawImage(image,0,0,art.width,art.height);
-  for(let x=476;x<1036;x+=4){
-    const arc=Math.sin(Math.PI*(x-476)/560);
-    const top=Math.round(377+36*arc);
-    const bottom=x>=822&&x<920?514:Math.round(412+42*arc);
-    const width=Math.min(4,1036-x);
-    const edge=Math.min(1,(x-476)/12,(1036-x)/12);
-    for(let y=top;y<bottom;y+=3){
-      const height=Math.min(3,bottom-y);
-      const feather=Math.min(1,(y-top+1)/8,(bottom-y)/9);
-      layer.globalAlpha=edge*feather;
-      const sampleY=518+(y-top)*42/(bottom-top);
-      layer.drawImage(image,x,sampleY,width,2,x,y,width,height);
-    }
-  }
-
-  // Landmark pairs are [image coordinate, world coordinate].
-  const columns=[[0,0],[378,784],[490,960],[1020,2240],[1110,2416],[1774,3200]];
-  const rows=[[0,0],[198,324],[303,448],[394,704],[625,1088],[685,1250],[807,1472],[887,1600]];
-  for(let row=1;row<rows.length;row++){
-    const [sy,y]=rows[row-1], [nextSY,nextY]=rows[row];
-    for(let col=1;col<columns.length;col++){
-      const [sx,x]=columns[col-1], [nextSX,nextX]=columns[col];
-      ctx.drawImage(art,sx,sy,nextSX-sx,nextSY-sy,x,y,nextX-x,nextY-y);
-    }
-  }
-}
-
-function drawTidalTerrain(ctx,map,backdrop){
+function drawTidalTerrain(ctx,map){
   const {water}=map.tidal;
-  if(backdrop){
-    drawTidalIllustration(ctx,backdrop);
-    return;
-  }
   gradient(ctx,0,0,map.width,map.height,[[0,'#142530'],[.64,'#24505a'],[1,'#10282f']]);
   gradient(ctx,water.x,water.y,water.w,water.h,[[0,'#327b83'],[1,'#103d48']]);
 }
@@ -561,11 +524,12 @@ export function buildScenery(map, {includePlatforms = true, atlas = null, backdr
   canvas.width = map.width * scale;
   canvas.height = Math.round(map.height * scale);
   canvas.worldScale = scale;
+  if(map.tidal&&backdrop&&!preview)return projectTidalArt(canvas,backdrop,map);
   const ctx = canvas.getContext('2d');
   const look = arenaLooks[map.theme] || arenaLooks.foundry;
   ctx.scale(scale,scale);
   if(map.tidal){
-    drawTidalTerrain(ctx,map,backdrop);
+    drawTidalTerrain(ctx,map);
     if(preview)drawTidalBridge(ctx,map);
     return canvas;
   }
