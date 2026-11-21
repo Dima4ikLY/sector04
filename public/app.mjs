@@ -249,12 +249,12 @@ function createTeamThumbnail(map){
   return preview;
 }
 function createMapPreview(map){
-  if(map.tidal)return buildScenery(map,{preview:true});
-  if(map.backdrop?.aligned){
+  if(map.tidal||map.backdrop?.aligned){
     const image=new Image(480,240);
     image.src=`/art/backgrounds/${map.backdrop.file}`;
     image.alt='';
     image.decoding='async';
+    if(map.tidal)image.onerror=()=>image.replaceWith(buildScenery(map,{preview:true}));
     return image;
   }
   if(!map.teamSpawns){

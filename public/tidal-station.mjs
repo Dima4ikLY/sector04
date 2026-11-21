@@ -4,6 +4,7 @@ export const tidalStation={
   width:3200,height:1600,theme:'spillway',zoom:0.85,jumpSpeed:780,maxJumps:1,
   terrain:'Разрушаемый мост, гидроподъёмники и тоннель',
   description:'Поднимитесь на мост по струям или обойдите соперников вплавь под кровлей тоннеля.',
+  backdrop:{file:'flooded-station.png'},
   modes:['ffa','1v1','2v2','3v3'],
   platforms:[
     {id:'P01',x:128,y:960,w:192,h:32},
