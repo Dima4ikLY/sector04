@@ -497,6 +497,7 @@ function syncMatchQueue(initial=false){
 }
 async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,mapId=lobbyMap(matchMode??'ffa'),roomOptions=undefined){
   if(joining||session)return;joining=true;clearControls();$('error').textContent='';document.querySelectorAll('#lobby button').forEach(b=>b.disabled=true);
+  document.documentElement.classList.add('arena-visible');
   syncMapChoices(selectedMap);
   battleAudioReady=audio.unlock().catch(()=>{});
   const showJoining=mode==='quick'||(mode==='create'&&matchMode==='1v1');
@@ -590,11 +591,13 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
   }catch(error){clearBattleIntro();$('error').textContent=error.message;toast(error.message);}
   finally{
     if(showJoining&&!session)$('queueOverlay').hidden=true;
+    if(!session)document.documentElement.classList.remove('arena-visible');
     joining=false;syncMapChoices(selectedMap);document.querySelectorAll('#lobby button').forEach(b=>b.disabled=false);roomBrowser.setPlaying(!!session);
   }
 }
 async function leave(){
   if(!session)return;const old=session;session=null;stream?.close();stream=null;clearControls();motion.reset();canvas.style.cursor='default';
+  document.documentElement.classList.remove('arena-visible');
   audio.stopSlides();
   clearBattleIntro();
   resetResultOverlay();
