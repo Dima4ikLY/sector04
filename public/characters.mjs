@@ -74,7 +74,8 @@ export function characterPose(p,time,weapon){
   const lean=((p.visualSpeed??p.vx??0)/285)*(gait.backwards?.025:.045);
   const rotation=death?death*Math.PI*.49*(1-.94*gait.prone):lean;
   const bracing=1-.65*gait.prone;
-  const posture=(p.dead>0?0:lean)+gait.facing*(.24*gait.lowering+1.26*gait.prone+(gait.airPitch??0));
+  const posture=(p.dead>0?0:lean)+gait.facing*(.24*gait.lowering+1.26*gait.prone+(gait.airPitch??0))
+    +.22*(gait.flip?.tuck??0)*(gait.flip?.facing??1);
   const bodyRotation=posture*(1-gait.slide)-.70*gait.slide*gait.slideDirection
     +(hit.lean-gait.facing*shot.recoil*.065)*bracing;
   const fireHeight=(32-14*gait.lowering-5*gait.prone)*(1-gait.slide)+18*gait.slide;
@@ -465,6 +466,13 @@ export function drawCharacterLabel(c,p,{me=false,ally=false,teamColor,pickupNoti
   c.restore();
 }
 
+function projectFlip({angle,axis}){
+  const cos=Math.cos(angle),sin=Math.sin(angle)*axis.z;
+  // Retain visible thickness as the side roll turns edge-on to the camera.
+  const width=axis.x?(.58+.42*Math.abs(cos))/Math.hypot(cos,sin):1;
+  return [cos*width,sin*width,-sin,cos];
+}
+
 export function drawCharacter(c,p,{time=0,me=false,angle=p.angle||0,weapon=null,labels=true,body=true,effects=true,skinEffects=true,trackMuzzle=false}={}){
   const appearance=validAppearance(p.appearance)?p.appearance:defaultAppearance;
   const selectedPalette=characterPalettes.find(option=>option.id===appearance.palette);
@@ -490,6 +498,14 @@ export function drawCharacter(c,p,{time=0,me=false,angle=p.angle||0,weapon=null,
   if(body&&pose.alpha>0){
     if(lift)c.translate(0,-lift);
     if(scaleY!==1)c.scale(1,scaleY);
+    const flip=death?null:pose.flip;
+    const spin=flip?projectFlip(flip):null;
+    if(spin){
+      c.save();
+      c.translate(0,-flip.pivot);
+      c.transform(...spin,0,0);
+      c.translate(0,flip.pivot);
+    }
     const legs=[
       [pose.leftHip,pose.leftKnee,pose.leftFoot,pose.leftFootPitch,palette.dark],
       [pose.rightHip,pose.rightKnee,pose.rightFoot,pose.rightFootPitch,palette.main]
@@ -525,7 +541,7 @@ export function drawCharacter(c,p,{time=0,me=false,angle=p.angle||0,weapon=null,
     c.restore();
 
     const aim=angle-(pose.gunKick-.24*pose.hit.dip)*direction,recoil=pose.recoil*3.6;
-    const reach=22-7*pose.prone-5*pose.slide-recoil;
+    const reach=(22-7*pose.prone-5*pose.slide-recoil)*(1-.36*(flip?.tuck??0));
     const forward=Math.cos(aim)*direction;
     const gripX=reach*(forward+.8*pose.prone*(1-forward))+11*pose.prone-4*gunWeight;
     const rest=upperPoint(direction*4,-30);
@@ -567,12 +583,23 @@ export function drawCharacter(c,p,{time=0,me=false,angle=p.angle||0,weapon=null,
     if(trackMuzzle&&!death){
       const tip=weaponTip2D(p.weapon);
       const tipX=Math.cos(barrelAngle),tipY=Math.sin(barrelAngle);
+      let offsetX=hand[0]+tipX*tip,offsetY=hand[1]+tipY*tip;
+      let barrelX=tipX,barrelY=tipY;
+      if(spin){
+        const [xx,yx,xy,yy]=spin;
+        const centeredY=offsetY+flip.pivot;
+        offsetY=yx*offsetX+yy*centeredY-flip.pivot;
+        offsetX=xx*offsetX+xy*centeredY;
+        barrelX=xx*tipX+xy*tipY;
+        barrelY=yx*tipX+yy*tipY;
+      }
       muzzle={
-        x:x+hand[0]+tipX*tip,y:y-lift+(hand[1]+tipY*tip)*scaleY,
-        angle:scaleY===1?barrelAngle:Math.atan2(tipY*scaleY,tipX)
+        x:x+offsetX,y:y-lift+offsetY*scaleY,
+        angle:!spin&&scaleY===1?barrelAngle:Math.atan2(barrelY*scaleY,barrelX)
       };
     }
 
+    if(spin)c.restore();
     if(!p.dead&&p.shield>0){
       const height=visualStanceHeight(p);
       c.strokeStyle='#a7d4ec82';

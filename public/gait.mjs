@@ -1,4 +1,4 @@
-import {SLIDE_DURATION} from './engine.mjs';
+import {FLIP_DURATION,SLIDE_DURATION} from './engine.mjs';
 
 const tau=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const stanceHeights={stand:58,crouch:40,prone:23,slide:40};
@@ -12,6 +12,7 @@ const legLength=15;
 const maxReach=2*legLength-.02;
 const runStep={cycle:90,contact:.40,edgeSpeed:.44};
 const crouchStep={cycle:64,contact:.47,edgeSpeed:.78};
+const sagittalAxis={x:0,z:1},lateralAxis={x:Math.sqrt(3)/2,z:.5};
 
 export function visualStanceHeight(p){
   const height=p.visualStanceHeight??p.stanceHeight;
@@ -89,6 +90,16 @@ function jumpMotion(p,airborne){
   return {flight,ascent,descent,extension,recovery,compression};
 }
 
+function flipMotion(p,airborne,height){
+  const {flip,flipAge}=p;
+  if(!airborne||!flip||!Number.isFinite(flipAge)||flipAge<0||flipAge>=FLIP_DURATION)return null;
+  const {kind,facing}=flip;
+  const progress=flipAge/FLIP_DURATION;
+  const axis=kind==='side'?lateralAxis:sagittalAxis;
+  const direction=(kind==='backward'?-1:1)*facing;
+  return {kind,facing,axis,pivot:height/2,angle:direction*tau*ease(progress),tuck:Math.sin(Math.PI*progress)};
+}
+
 export function gaitPose(p,time){
   const facing=Math.cos(p.angle||0)>=0?1:-1;
   const velocity=Number.isFinite(p.visualSpeed)?p.visualSpeed:p.vx||0;
@@ -99,6 +110,7 @@ export function gaitPose(p,time){
   const backwards=velocity*facing<0;
   const run=ease(clamp(speed/240,0,1)),crouchWalk=ease(clamp(speed/140,0,1)),crawl=ease(clamp(speed/65,0,1));
   const height=visualStanceHeight(p),lowering=ease(clamp((58-height)/18,0,1)),prone=ease(clamp((40-height)/17,0,1));
+  const flip=flipMotion(p,airborne,height);
   const slideDirection=p.slideDirection||0;
   const slide=!dead&&slideDirection&&p.slide>0
     ? ease(clamp((SLIDE_DURATION-p.slide)/.075,0,1))*ease(clamp(p.slide/.11,0,1))*(1-prone)
@@ -162,13 +174,22 @@ export function gaitPose(p,time){
       foot.y=mix(foot.y,ankleFloor-(lead?1.1:.65),slide);
       pitch=mix(pitch,(lead?.18:-.15)*slideDirection*facing,slide);
     }
+    if(flip){
+      const {facing:flipFacing,tuck,kind}=flip;
+      const stagger=kind==='side'?lane*4:lane*1.7;
+      hip.x=mix(hip.x,lane*2,tuck);
+      hip.y=mix(hip.y,-26,tuck);
+      foot.x=mix(foot.x,flipFacing*(4+stagger),tuck);
+      foot.y=mix(foot.y,-15+stagger,tuck);
+      pitch=mix(pitch,.48*flipFacing,tuck);
+    }
     const maxVertical=Math.sqrt(Math.max(0,maxReach**2-(hip.x-foot.x)**2));
     hip.y=Math.max(hip.y,foot.y-maxVertical);
     return {hip,foot,knee:stanceKnee(hip,foot,facing,lane,prone,proneKneeY),pitch};
   }
   const left=leg(0,-1),right=leg(.5,1);
   return {
-    facing,backwards,airborne,bob,stride:mix(Math.sin(runPhase)*11*run,Math.sin(crouchPhase)*5*crouchWalk,lowering)*(1-prone)*(1-slide),lowering,prone,slide,slideDirection,
+    facing,backwards,airborne,bob,stride:mix(Math.sin(runPhase)*11*run,Math.sin(crouchPhase)*5*crouchWalk,lowering)*(1-prone)*(1-slide),lowering,prone,slide,slideDirection,flip,
     airPitch:(flightWeight*(.11*jump.ascent-.10*jump.descent)+.22*jump.compression)*(1-.7*prone),
     bodyX:(left.hip.x+right.hip.x)/2,bodyY:(left.hip.y+right.hip.y)/2,
     leftFoot:left.foot,rightFoot:right.foot,leftHip:left.hip,rightHip:right.hip,leftKnee:left.knee,rightKnee:right.knee,

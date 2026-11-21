@@ -80,6 +80,7 @@ const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 let proneRequested=false;
 let startingCoop=false;
 let interactionSequence=0,requestedInteraction=0;
+let flipSequence=0,flipPending=null;
 let medkitSequence=0,medkitPending=null;
 const medkitButtons=[...document.querySelectorAll('[data-medkit]')];
 const buffHud=$('buffHud'),buffChips=[...buffHud.children];
@@ -368,7 +369,7 @@ $('rangeWeapon').addEventListener('change',event=>{
   selectWeapon(Number(event.target.value));
   canvas.focus({preventScroll:true});
 });
-function clearControls(){keys.clear();touchKeys.clear();slideGesture.reset();grenadePending=false;medkitPending=null;proneRequested=false;requestedInteraction=0;if(touchJoystick)resetJoystick();}
+function clearControls(){keys.clear();touchKeys.clear();slideGesture.reset();grenadePending=false;medkitPending=null;proneRequested=false;requestedInteraction=0;flipPending=null;if(touchJoystick)resetJoystick();}
 const waitingForMatch=()=>world.match?.phase==='waiting';
 const battleLocked=()=>waitingForMatch()||!!world.countdown;
 function syncBattleMusic(){
@@ -731,6 +732,11 @@ function requestInteraction(){
   if(!canControl())return;
   requestedInteraction=++interactionSequence;
 }
+function requestFlip(){
+  if(!canControl())return;
+  const left=holding('left')||touchKeys.has('left'),right=holding('right')||touchKeys.has('right');
+  flipPending={flip:++flipSequence,flipDirection:Number(right)-Number(left)};
+}
 function requestMedkit(kind){
   if(!canControl()||medkitPending)return;
   const player=world.players.find(p=>p.id===session.id);
@@ -772,6 +778,7 @@ window.addEventListener('keydown',event=>{
     return;
   }
   if(event.repeat)return;
+  if(action==='flip'){requestFlip();return;}
   const checkSlide=(action==='slide'||action==='left'||action==='right')&&!keyboardSlideDirection();
   if(action==='prone')proneRequested=!proneRequested;
   else if(action==='interact')requestInteraction();
@@ -825,11 +832,13 @@ touchJoystick.addEventListener('pointerdown',event=>{
 });
 touchJoystick.addEventListener('pointermove',event=>{if(event.pointerId===joystickPointerId)updateJoystick(event);});
 for(const type of ['pointerup','pointercancel','lostpointercapture'])touchJoystick.addEventListener(type,event=>{if(event.pointerId===joystickPointerId)resetJoystick();});
+$('flipButton').addEventListener('click',event=>{if(event.detail===0)requestFlip();});
 document.querySelectorAll('[data-control]:not([data-control="weapon"])').forEach(button=>{
   const control=button.dataset.control;
   button.addEventListener('pointerdown',event=>{
     event.preventDefault();
     if(!canControl())return;
+    if(control==='flip'){requestFlip();return;}
     if(control==='prone'){
       proneRequested=!proneRequested;
       return;
@@ -870,7 +879,7 @@ function input(){
   return {left:active&&(holding('left')||touchKeys.has('left')),right:active&&(holding('right')||touchKeys.has('right')),
     jump,jet,down:active&&(holding('crouch')||touchKeys.has('crouch')||touchKeys.has('down')),crouch:changeStance&&(holding('crouch')||touchKeys.has('crouch')),prone:changeStance&&proneRequested,
     fire:active&&(keys.has('Mouse0')||touchKeys.has('fire')),reload:active&&(holding('reload')||touchKeys.has('reload')),grenade:active&&grenadePending,
-    interact:active?requestedInteraction:0,angle,weapon:session?.weapon,...(active&&medkitPending)};
+    interact:active?requestedInteraction:0,angle,weapon:session?.weapon,...(active&&medkitPending),...(active&&flipPending)};
 }
 setInterval(async()=>{
   if(!session||inputPending)return;
@@ -883,6 +892,7 @@ setInterval(async()=>{
     await api('input',{token:current.token,input:controls});
     if(session===current&&controls.grenade)grenadePending=false;
     if(session===current&&controls.medkitSeq===medkitPending?.medkitSeq)medkitPending=null;
+    if(session===current&&controls.flip===flipPending?.flip)flipPending=null;
   }catch(error){if(session===current&&error.status===401){toast(error.message);leave();}}
   finally{inputPending=false;}
 },50);
@@ -928,7 +938,7 @@ function updateHud(){
   updateBattleIntro(!!me&&!waiting);
   if(waiting||!me)return;
   if(!world.match&&$('matchHud').hidden!==battleLocked())syncPlayHud(battleLocked());
-  if(me.dead>0){proneRequested=false;slideGesture.reset();medkitPending=null;}
+  if(me.dead>0){proneRequested=false;slideGesture.reset();medkitPending=null;flipPending=null;}
   $('crouchButton').setAttribute('aria-pressed',String(me.stance==='crouch'&&me.dead<=0));
   $('proneButton').setAttribute('aria-pressed',String(me.stance==='prone'&&me.dead<=0));
   $('timer').textContent=`${String(Math.floor(world.time/60)).padStart(2,'0')}:${String(Math.floor(world.time%60)).padStart(2,'0')}`;

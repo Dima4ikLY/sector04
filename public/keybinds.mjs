@@ -1,12 +1,12 @@
 export const keyActions=Object.freeze({
-  left:'Движение влево',right:'Движение вправо',jump:'Прыжок',
+  left:'Движение влево',right:'Движение вправо',jump:'Прыжок',flip:'Сальто',
   crouch:'Присесть',slide:'Подкат в движении',prone:'Лечь / встать',jet:'Полёт',
   reload:'Перезарядка',grenade:'Граната',medkitSmall:'Малая аптечка',medkitLarge:'Большая аптечка',
   interact:'Действие с объектом',score:'Таблица боя'
 });
 
 export const defaultBindings=Object.freeze({
-  left:'KeyA',right:'KeyD',jump:'KeyW',crouch:'KeyS',slide:'ControlLeft',prone:'KeyC',
+  left:'KeyA',right:'KeyD',jump:'KeyW',flip:'KeyX',crouch:'KeyS',slide:'ControlLeft',prone:'KeyC',
   jet:'Space',reload:'KeyR',grenade:'KeyQ',medkitSmall:'Digit1',medkitLarge:'Digit2',interact:'KeyE',score:'Tab'
 });
 export const weaponSlotCodes=Object.freeze([
@@ -84,7 +84,7 @@ function bindingConflict(bindings){
 
 const fallbackLetters=Array.from('ABCDEFGHIJKLMNOPQRSTUVWXYZ',letter=>`Key${letter}`);
 function freeDefault(bindings,action,...fallbacks){
-  const used=new Set(actions.filter(other=>other!==action).flatMap(other=>actionCodes(bindings,other)));
+  const used=new Set(Object.keys(bindings).filter(other=>other!==action).flatMap(other=>actionCodes(bindings,other)));
   const primary=defaultBindings[action],alias=defaultAliases[action];
   return [primary,...fallbacks,...fallbackLetters].find(code=>!used.has(code)&&
     (code!==primary||!alias||!used.has(alias)));
@@ -92,6 +92,8 @@ function freeDefault(bindings,action,...fallbacks){
 
 export function normalizeBindings(value){
   const bindings={...defaultBindings};
+  // Assign the new action after migrating legacy shortcuts that may use X.
+  if(!allowedCode.test(value?.flip??''))delete bindings.flip;
   // Before slide became a binding, profiles saved left Ctrl as the crouch default.
   const oldCrouch=!Object.hasOwn(value??{},'slide')&&value?.crouch==='ControlLeft';
   for(const action of actions){
@@ -103,6 +105,7 @@ export function normalizeBindings(value){
   if(oldCrouch||!allowedCode.test(value?.crouch??''))bindings.crouch=freeDefault(bindings,'crouch','ArrowDown');
   if(!allowedCode.test(value?.slide??''))bindings.slide=freeDefault(bindings,'slide','ControlRight','ShiftLeft','KeyX');
   if(!allowedCode.test(value?.interact??''))bindings.interact=freeDefault(bindings,'interact','KeyF');
+  if(!bindings.flip)bindings.flip=freeDefault(bindings,'flip','KeyF','KeyV');
   // Repair overlapping stored bindings without replacing an unrelated shortcut.
   // The defaults are conflict-free, so each repair removes one custom binding.
   let conflict;

@@ -442,6 +442,11 @@ export function createArenaServer({
           const i=b.input||{},player=s.player;
           // Keep the pulse until a simulation tick consumes it, even if newer controls arrive first.
           const slide=i.slide===-1||i.slide===1?i.slide:player.input.slide??0;
+          const newFlip=Number.isSafeInteger(i.flip)&&i.flip>(player.input.flip??0);
+          const flip=newFlip?i.flip:player.input.flip;
+          const flipDirection=newFlip
+            ? ([-1,0,1].includes(i.flipDirection)?i.flipDirection:undefined)
+            : player.input.flipDirection;
           let {medkit,medkitSeq}=player.input;
           if(typeof i.medkit==='string'&&Object.hasOwn(medkits,i.medkit)&&Number.isSafeInteger(i.medkitSeq)&&i.medkitSeq>(s.medkitSeq??0)){
             s.medkitSeq=i.medkitSeq;
@@ -449,7 +454,7 @@ export function createArenaServer({
           }
           player.input={left:!!i.left,right:!!i.right,jump:!!i.jump,jet:!!i.jet,fire:!!i.fire,reload:!!i.reload,grenade:!!i.grenade,
             crouch:i.crouch===true,down:i.down===true,prone:i.prone===true,interact:i.interact===true||(Number.isSafeInteger(i.interact)&&i.interact>0?i.interact:0),
-            slide:player.dead>0?0:slide,...(player.dead>0||!medkit?{}:{medkit,medkitSeq}),
+            slide:player.dead>0?0:slide,flip,flipDirection,...(player.dead>0||!medkit?{}:{medkit,medkitSeq}),
             angle:Number.isFinite(i.angle)?i.angle:0,weapon:Number.isInteger(i.weapon)?i.weapon:undefined};
           return json(res,200,{ok:true});
         }

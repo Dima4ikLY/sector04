@@ -13,6 +13,7 @@ export const COOP_CAPACITY=3;
 const COOP_WAVES=3, COOP_BREAK=4;
 export const PLAYER_HEIGHT=58;
 export const SLIDE_DURATION=.42;
+export const FLIP_DURATION=.48;
 export const BULLET_FLYBY_DISTANCE=135;
 const slideStartSpeed=560,slideEndSpeed=245;
 const playerGravity=1450;
@@ -136,6 +137,8 @@ function respawn(p,world) {
   p.slide=0;
   p.slideDirection=0;
   delete p.slideAudio;
+  delete p.flip;
+  delete p.flipEndedAt;
   p.airborne=false;
   delete p.airAt;
   delete p.landAt;
@@ -552,6 +555,7 @@ function damage(world,victim,amount,owner,impactX=0,impactY=1,zone) {
   if(!victim.hp){
     victim.medkit=null;
     delete victim.slideAudio;
+    endFlip(victim,world.time);
     clearBuffs(victim);
     victim.deathImpact={time:world.time,dx,dy};
     pendingDeathFalls.set(victim,world.time-deathFallContactDelay(victim.target,victim.appearance?.style));
@@ -618,6 +622,7 @@ function interact(world,map,mechanisms,mechanism,player,time){
   player.input.slide=0;
   player.airborne=false;
   player.jetActive=false;
+  endFlip(player,time);
   delete player.slideAudio;
   delete player.airAt;
   delete player.landAt;
@@ -637,6 +642,31 @@ function takeMedkitInput(player){
   if(typeof kind!=='string'||!Object.hasOwn(medkits,kind)||!Number.isSafeInteger(sequence)||sequence<=(player.lastMedkitSequence??0))return null;
   player.lastMedkitSequence=sequence;
   return kind;
+}
+function takeFlipInput(player){
+  const sequence=player.input.flip;
+  if(!Number.isSafeInteger(sequence)||sequence<=(player.lastFlip??0))return false;
+  player.lastFlip=sequence;
+  return true;
+}
+function endFlip(player,time){
+  if(!player.flip)return;
+  delete player.flip;
+  player.flipEndedAt=time;
+}
+function updateFlip(player,input,requested,allowed,time,dt){
+  if(!allowed||!player.airborne||player.jetActive||player.stance!=='stand'){
+    endFlip(player,player.airborne?time+dt:player.landAt??time);
+    return;
+  }
+  if(player.flip&&player.flip.at-time>=FLIP_DURATION)delete player.flip;
+  if(!requested||player.flip)return;
+  const facing=Math.cos(player.angle)>=0?1:-1;
+  const held=Number(!!input.right)-Number(!!input.left);
+  const direction=input.flipDirection??held;
+  const kind=direction===0?'side':direction===facing?'forward':'backward';
+  player.flip={kind,facing,at:time+dt};
+  delete player.flipEndedAt;
 }
 function beginMedkit(world,player,kind){
   if(!kind||player.bot||player.medkit||player.hp<=0||player.hp>=100)return;
@@ -825,6 +855,7 @@ export function step(world,dt) {
   world.combatEvents=world.combatEvents.filter(event=>event.time-world.time<.8);
   for(const p of world.players){
     const medkitRequest=takeMedkitInput(p);
+    const flipRequest=takeFlipInput(p);
     if(p.target){
       if(p.dead>0){
         if(pendingDeathFalls.has(p))updateDeathFall(world,map,p,groundSupport(p,obstacles),p.x,p.y,0,dt);
@@ -836,6 +867,7 @@ export function step(world,dt) {
     if(p.dead>0){
       p.medkit=null;
       delete p.slideAudio;
+      endFlip(p,world.time);
       p.input.slide=0;
       if(activated){
         interactionPressed(p,p.input.interact);
@@ -946,6 +978,7 @@ export function step(world,dt) {
     }
     const wasAirborne=p.airborne;
     updateFlight(world,map,p,landingSurface,oldX,oldY,fallSpeed,dt,jumping);
+    updateFlip(p,i,flipRequest,!treating&&!assisted,world.time,dt);
     if(sliding){
       const blocked=(p.x-oldX)*p.slideDirection<Math.abs(moveX)-1e-7;
       if(blocked)p.vx=0;
@@ -964,7 +997,7 @@ export function step(world,dt) {
       damage(world,p,p.hp,null);
     }
     if(reloadBefore>0&&p.dead<=0)reloadAudio(world,p,gun.reload,reloadBefore,dt,oldX,oldY);
-    if(i.fire&&p.cool<=0&&p.reload<=0&&p.ammo>0){
+    if(i.fire&&!p.flip&&p.cool<=0&&p.reload<=0&&p.ammo>0){
       // Newly spawned rounds travel during this step. Timestamp the matching
       // animation cue at the start of that interval.
       fireWeapon(world,map,obstacles,p,gun,world.time+dt);

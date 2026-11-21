@@ -5,6 +5,8 @@ import {sampleHitMotion,sampleReloadPose} from './actor-motion.mjs';
 import {sampleDeathPose} from './death-motion.mjs';
 import {sampleSkinTransition} from './skin-transitions.mjs';
 import {TRANSPARENT_OPACITY} from './pickup-effects.mjs';
+const flipAxis=new THREE.Vector3();
+
 function roundedBoxGeometry(radius,edgeSteps){
   const inner=.5-radius;
   const grid=[
@@ -551,9 +553,9 @@ export function buildCharacterModel(appearance=defaultAppearance,weapon=3,hasJet
     ...(look?fantasyMaterials(look):{}),
     ...weaponMaterials(weapon)
   };
-  const root=new THREE.Group(),yaw=new THREE.Group(),body=new THREE.Group();
+  const root=new THREE.Group(),tumble=new THREE.Group(),yaw=new THREE.Group(),body=new THREE.Group();
   const crystalGlints=[];
-  root.add(yaw);yaw.scale.y=.855;yaw.add(body);body.position.y=32.5;
+  root.add(tumble);tumble.add(yaw);yaw.scale.y=.855;yaw.add(body);body.position.y=32.5;
 
   const legs=[-1,1].map(side=>{
     const depth=side*4.7;
@@ -629,7 +631,7 @@ export function buildCharacterModel(appearance=defaultAppearance,weapon=3,hasJet
     mesh(body,'plate',[-12.8,7.68,0],[.71,1.15,9.54],mats.webbing);
   }
   return {
-    root,yaw,body,head,legs,arms,gun,muzzleTip:tip,magazine,spareMagazine,magazineSocket,medkitProp,flash,flames,crystalGlints,style,
+    root,tumble,yaw,body,head,legs,arms,gun,muzzleTip:tip,magazine,spareMagazine,magazineSocket,medkitProp,flash,flames,crystalGlints,style,
     supportGrip:weapon===8?11:weapon===9?8:5,
     flashLength:weapon===8?15:10,
     materials:[...Object.values(mats),...vestMaterials,...helmetMaterials,...emblemMaterials,...medkitMaterials,flashMaterial,...flames.map(flame=>flame.material),
@@ -663,6 +665,11 @@ export function poseCharacterModel(model,p,time,weaponInfo,{turn=0,dt=1/60,skinE
   const x=Number.isFinite(p.x)?p.x:0,y=Number.isFinite(p.y)?p.y:0;
   model.root.position.set(x,810-y+(transition?.lift??0),0);
   model.root.scale.y=transition?.scaleY??1;
+  const flip=death?null:pose.flip,pivot=flip?.pivot??0;
+  model.tumble.position.y=pivot;
+  model.yaw.position.y=-pivot;
+  if(flip)model.tumble.quaternion.setFromAxisAngle(flipAxis.set(flip.axis.x,0,flip.axis.z),-flip.angle);
+  else model.tumble.quaternion.identity();
   const wanted=(dir>0?-.48:Math.PI+.48)+turn;
   if(model.yawAngle===null)model.yawAngle=wanted;else model.yawAngle+=Math.atan2(Math.sin(wanted-model.yawAngle),Math.cos(wanted-model.yawAngle))*(1-Math.exp(-16*dt));
   model.yaw.rotation.y=model.yawAngle;
@@ -684,7 +691,7 @@ export function poseCharacterModel(model,p,time,weaponInfo,{turn=0,dt=1/60,skinE
   const reload=p.dead>0?null:sampleReloadPose(p.reload,weaponInfo?.reload);
   const loadWeight=(reload?.weight??0)*(1-.65*pose.prone)*(1-treatment);
   const hip=model.body.position,tilt=model.body.rotation.z,cos=Math.cos(tilt),sin=Math.sin(tilt);
-  const reach=19-6*pose.prone-4*pose.slide,recoil=death?0:pose.recoil*(1-.65*loadWeight)*3.8;
+  const reach=(19-6*pose.prone-4*pose.slide)*(1-.36*(flip?.tuck??0)),recoil=death?0:pose.recoil*(1-.65*loadWeight)*3.8;
   const impact=death?0:pose.hit.dip*(1-.65*pose.prone);
   const lowered=Math.max(pose.lowering,pose.slide);
   const height=(hip.y+5)*(1-lowered)+((pose.fireHeight-.8*pose.prone)/model.yaw.scale.y)*lowered;

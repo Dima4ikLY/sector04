@@ -1,4 +1,4 @@
-import {ROUND,SLIDE_DURATION,clamp,weapons} from './engine.mjs';
+import {FLIP_DURATION,ROUND,SLIDE_DURATION,clamp,weapons} from './engine.mjs';
 import {getMap} from './maps.mjs';
 import {advanceGrenade,GRENADE_EFFECT_DURATION,GRENADE_FUSE} from './grenade.mjs';
 import {mapWithMechanisms,PORTAL_FLASH_DURATION} from './map-interactives.mjs';
@@ -135,7 +135,8 @@ export class SnapshotBuffer {
       }
       if(old.dead>0||p.dead>0||p.deaths!==old.deaths)return alpha<1?old:p;
       const angle=old.angle+Math.atan2(Math.sin(p.angle-old.angle),Math.cos(p.angle-old.angle))*alpha;
-      return {...p,...sampleSlide(old,p,a.time,b.time,time),...sampleReload(old,p,a.time,b.time,time,alpha),...sampleMedkit(old,p,a.time,b.time,time),...sampleFlight(old,p,a.time,b.time,time,alpha),x,vx,gaitDistance:mix(old.gaitDistance||0,p.gaitDistance||0,alpha),jetFuel:mix(old.jetFuel??100,p.jetFuel??100,alpha),angle,cool:Math.max(0,old.cool-(time-a.time))};
+      const flip=occurred(p.flip?.at,worldTime)?p.flip:occurred(p.flipEndedAt,worldTime)?undefined:old.flip;
+      return {...p,...sampleSlide(old,p,a.time,b.time,time),...sampleReload(old,p,a.time,b.time,time,alpha),...sampleMedkit(old,p,a.time,b.time,time),...sampleFlight(old,p,a.time,b.time,time,alpha),flip,x,vx,gaitDistance:mix(old.gaitDistance||0,p.gaitDistance||0,alpha),jetFuel:mix(old.jetFuel??100,p.jetFuel??100,alpha),angle,cool:Math.max(0,old.cool-(time-a.time))};
     });
     const mechanisms=b.world.mechanisms?.map((state,index)=>{
       const old=a.world.mechanisms?.[index];
@@ -346,7 +347,9 @@ export function applyMotionCues(world,now=world.time,next=world){
   return {...world,effectTime:now,arenaEffects:[...arenaEffects.values()],pickupNotices:notices,players:world.players.map(p=>{
     const shot=shots.get(p.id),hit=hits.get(p.id),death=p.dead>0?p.deathImpact:null;
     const spawned=!waiting&&!(p.dead>0)&&occurred(p.spawnAt,now);
+    const age=p.airborne&&!(p.dead>0)&&occurred(p.flip?.at,now)?ageAt(p.flip.at,now):undefined;
     return {...p,
+      flipAge:age<FLIP_DURATION?age:undefined,
       shotAge:shot?ageAt(shot.time,now):undefined,shotAngle:shot?.angle,
       hitAge:hit?ageAt(hit.time,now):undefined,hitDirection:hit?hit.dx/hit.amount:undefined,hitVertical:hit?hit.dy/hit.amount:undefined,hitAmount:hit?.amount,
       spawnAge:spawned?ageAt(p.spawnAt,now):undefined,
