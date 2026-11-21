@@ -120,10 +120,12 @@ export function createRoomBrowser({mount,onJoin,onCreate,onNotice=()=>{}}){
   function toggle(){if(details.open)refresh();else cancel();}
   refreshButton.addEventListener('click',refresh);
   details.addEventListener('toggle',toggle);
-  return {
+  function openCreate(){details.open=true;createForm.hidden=false;createButton.hidden=true;syncCreateMaps();refresh();}
+  return {openCreate,
     refresh,
     setPlaying(value){playing=!!value;if(playing){details.open=false;cancel();createForm.hidden=true;createButton.hidden=false;}else buttons();},
     destroy(){destroyed=true;cancel();details.removeEventListener('toggle',toggle);details.remove();}
   };
 }
+
 

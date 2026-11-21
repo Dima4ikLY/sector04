@@ -549,7 +549,7 @@ async function leave(){
   $('killfeed').replaceChildren();$('scoreTitle').textContent='ПОСЛЕДНИЙ БОЙ';$('connection').textContent='ПРЕВЬЮ КАРТЫ';showMapPreview(lobbyMap(selectedMatchMode));
   const pending=(async()=>{try{const result=await api('leave',{token:old.token});if(!session)armory.setProfile(result.profile);}catch{}})();leaving=pending;await pending;if(leaving===pending)leaving=null;
 }
-$('quick').onclick=()=>join('quick');$('train').onclick=()=>join('train');$('range').onclick=()=>join('range');$('create').onclick=()=>join('create');$('leave').onclick=leave;
+$('quick').onclick=()=>join('quick');$('train').onclick=()=>join('train');$('range').onclick=()=>join('range');$('create').onclick=()=>roomBrowser.openCreate();$('leave').onclick=leave;
 $('duelPrivate').onclick=()=>join('create','1v1');
 $('queueCancel').onclick=leave;
 $('queueInvite').onclick=()=>copyInvitation($('queueInviteUrl'));
@@ -1356,6 +1356,9 @@ async function initVK(){
   }
 }
 initVK();
+
+
+
 
 
 
