@@ -236,7 +236,7 @@ export function createArenaServer({
       if(req.method==='GET'&&url.pathname==='/api/rooms'){
         const now=performance.now();
         return json(res,200,[...rooms.values()]
-          .filter(room=>room.world.match?.phase==='waiting'&&!room.world.match.private&&!room.world.countdown&&
+          .filter(room=>room.world.match?.phase==='waiting'&&!room.world.match.private&&
             (room.searchEndsAt===undefined||now<room.searchEndsAt))
           .map(({code,world})=>({code,mapId:world.mapId,players:world.players.length,ended:world.ended,mode:world.match.mode,capacity:world.match.capacity})));
       }
@@ -465,3 +465,4 @@ export function createArenaServer({
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const port=Number(process.env.PORT||4320);createArenaServer().listen(port,process.env.HOST||'0.0.0.0',()=>console.log(`SECTOR 04 → http://localhost:${port}`));
 }
+
