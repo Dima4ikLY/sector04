@@ -1,6 +1,10 @@
 // Foliage conceals fighters, but is never a physical collider for shots.
 export const coverDefinitions={
   foundry:[{x:290,y:760,w:120,h:96},{x:700,y:760,w:130,h:96},{x:1120,y:760,w:120,h:96}],
+  'flooded-station':[
+    {x:245,y:807,w:120,h:96},{x:1390,y:807,w:120,h:96},
+    {x:1620,y:563,w:108,h:80},{x:105,y:302,w:108,h:80}
+  ],
   'night-foundry':[
     {x:300,y:714,w:120,h:96},{x:1354,y:714,w:120,h:96},
     {x:360,y:458,w:104,h:80},{x:1310,y:458,w:104,h:80}

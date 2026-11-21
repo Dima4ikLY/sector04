@@ -50,6 +50,10 @@ const freeForAllAnchors={
 
 // Team layouts have identical supplies on both flanks and contested items on the center line.
 const teamAnchors={
+  'flooded-station':{
+    flank:[['small',278,807],['speed',694,807]],
+    center:[['critical',429],['armor',807]]
+  },
   'night-foundry':{
     flank:[['small',245,714],['large',390,458],['speed',705,355],['transparent',575,246]],
     center:[['critical',201],['armor',714]]
