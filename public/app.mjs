@@ -274,11 +274,18 @@ function createMapChoice(map){
   button.onclick=()=>selectMap(map.id);
   return button;
 }
-for(const button of mapModes)button.onclick=()=>{
-  if(session||joining||button.dataset.matchMode===selectedMatchMode)return;
-  selectedMatchMode=button.dataset.matchMode;
-  showMapPreview(lobbyMap(selectedMatchMode));
-};
+function activateMatchMode(mode){
+  if(session||joining||mode===selectedMatchMode)return;
+  const maps=getMapsForMode(mode);
+  if(!maps.length)return;
+  selectedMatchMode=mode;
+  const saved=mapSelections.get(mode);
+  showMapPreview(maps.some(map=>map.id===saved)?saved:maps[0].id);
+}
+for(const button of mapModes)button.addEventListener('click',event=>{
+  event.preventDefault();
+  activateMatchMode(button.dataset.matchMode);
+});
 const onlineCount=$('onlineCount');
 let onlineRefresh=false;
 async function refreshOnline(){

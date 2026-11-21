@@ -624,6 +624,7 @@ body:has(.startup-screen:not([hidden])) { overflow: hidden; }
   .battle-intro-copy { gap: 6px; padding: 9px 10px; }
   .battle-intro-copy p { font-size: 12px; }
 }
+
 @media (max-width: 360px) {
   .viewport > .battle-intro:is([data-phase="loading"],[data-phase="countdown"],[data-phase="exiting"]) { padding: 6px; }
   .battle-intro:is([data-phase="loading"],[data-phase="countdown"],[data-phase="exiting"]) .battle-intro-art { min-height: 94px; }
@@ -1411,4 +1412,63 @@ footer { margin-top: 20px; padding: 16px 0 22px; border-color: var(--line); colo
   .map-search { display: grid; padding: 9px; }
   .map-search-actions { width: 100%; }
   .map-search-actions > button { min-height: 40px; }
+}
+
+/* ===== Compact lobby: controls and maps above a full-width arena ===== */
+@media (min-width: 981px) {
+  .layout {
+    grid-template-columns: clamp(288px, 24vw, 342px) minmax(0, 1fr);
+    grid-template-areas: "sidebar maps" "arena arena";
+    grid-template-rows: max-content max-content;
+    align-items: start;
+  }
+  .sidebar { grid-template-columns: minmax(0, 1fr); }
+  .arena-panel { width: 100%; }
+  .map-choices[data-match-mode]:not([data-match-mode="ffa"]) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: none;
+  }
+}
+
+.map-selector {
+  position: relative;
+  padding: 16px;
+  border: 1px solid #334452;
+  border-radius: 0 8px 8px;
+  background: #151d25;
+  box-shadow: 0 10px 24px #0002;
+}
+.map-selector .map-selector-heading {
+  min-height: 30px;
+  margin: -16px -16px 13px;
+  padding: 0 12px 0 0;
+  border-bottom: 1px solid #2d3b47;
+}
+.map-catalog-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  margin: -1px 0;
+  padding: 0 15px;
+  border: 1px solid #efad5d;
+  border-bottom-color: #151d25;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, #403725, #292820);
+  color: #fff1d9;
+  box-shadow: inset 0 1px #ffd59b28;
+}
+.map-catalog-tab > span { color: var(--accent); font-size: 15px; }
+#mapCatalogTitle { color: inherit; font-size: 18px; }
+.map-selector #cameraHint { padding-bottom: 8px; }
+.map-selector .map-modes { margin-bottom: 12px; }
+.map-selector .map-search { margin-bottom: 0; }
+
+@media (max-width: 1240px) and (min-width: 981px) {
+  .map-choices[data-match-mode]:not([data-match-mode="ffa"]) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 980px) {
+  .map-selector { padding: 14px; }
+  .map-selector .map-selector-heading { margin: -14px -14px 12px; }
+  .map-catalog-tab { min-height: 40px; }
 }
