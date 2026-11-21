@@ -269,13 +269,12 @@ function updateStance(p,input,map,solids,grounded,allowSlide=true){
   const dimensions=stance=>map.tidal&&stance==='stand'?{...stances.stand,height:72,halfWidth:20}:stances[stance];
   const slideRequest=input.slide;
   if(slideRequest)input.slide=0;
-  const startsSlide=allowSlide&&p.stance==='stand'&&!input.jump&&!input.jet&&(slideRequest===-1||slideRequest===1);
+  const jumping=input.jump&&(grounded||!p.previous.jump);
+  const startsSlide=allowSlide&&p.stance==='stand'&&!jumping&&!input.jet&&(slideRequest===-1||slideRequest===1);
   let desired='stand';
-  if(grounded){
-    if(input.prone)desired='prone';
-    else if(input.crouch)desired='crouch';
-    else if(allowSlide&&(p.slide>0||startsSlide))desired='slide';
-  }
+  if(grounded&&input.prone)desired='prone';
+  else if(grounded&&input.crouch)desired='crouch';
+  else if(allowSlide&&(p.slide>0||startsSlide))desired='slide';
   if(p.stance!==desired){
     const {height,halfWidth}=dimensions(desired);
     const margin=halfWidth+3;
@@ -778,15 +777,19 @@ function damageBridge(world,surface,amount){
   }
 }
 
-function tidalMovement(p,input,map,shape,dt,jumpPressed){
-  const {tidal}=map;
-  const {height,halfWidth}=shape;
-  const {water,slope}=tidal;
+function tidalEnvironment(p,map,{height,halfWidth}){
+  const {water,jets}=map.tidal;
   const bodyY=p.y-height/2;
   const inWater=p.x>=water.x&&p.x<water.x+water.w&&bodyY>=water.y&&bodyY<water.y+water.h&&
     !map.solids.some(s=>!s.vertices&&p.x>s.x&&p.x<s.x+s.w&&bodyY>s.y&&bodyY<s.y+s.h);
+  const jet=jets.find(j=>p.x+halfWidth>j.x&&p.x-halfWidth<j.x+j.w&&p.y>j.y&&p.y-height<j.y+j.h);
+  return {bodyY,inWater,jet};
+}
+function tidalMovement(p,input,map,shape,dt,jumpPressed){
+  const {tidal}=map;
+  const {water,slope}=tidal;
+  const {bodyY,inWater,jet}=tidalEnvironment(p,map,shape);
   if(!inWater||p.vy>=0)p.waterLeap=false;
-  const jet=tidal.jets.find(j=>p.x+halfWidth>j.x&&p.x-halfWidth<j.x+j.w&&p.y>j.y&&p.y-height<j.y+j.h);
   if(jet){p.vy=jet.velocity;return true;}
   if(inWater&&!p.waterLeap){
     if(jumpPressed&&!input.down&&bodyY<water.y+tidal.surfaceBand){
@@ -882,7 +885,12 @@ export function step(world,dt) {
     if(Number.isFinite(i.angle))p.angle=i.angle;
     const support=p.onSlope?tidal?.slope:groundSupport(p,obstacles,tidal&&p.stance==='stand'?20:undefined);
     if(support)spawnSettling.delete(p);
-    const {height,halfWidth,speed}=updateStance(p,i,map,solids,!!support,!treating);
+    let allowSlide=!treating;
+    if(allowSlide&&tidal&&(p.slide>0||i.slide)){
+      const {inWater,jet}=tidalEnvironment(p,map,stances.slide);
+      allowSlide=!jet&&(!inWater||(p.waterLeap&&p.vy<0));
+    }
+    const {height,halfWidth,speed}=updateStance(p,i,map,solids,!!support,allowSlide);
     const standing=p.stance==='stand';
     const sliding=p.stance==='slide';
     p.vx=sliding
@@ -941,7 +949,7 @@ export function step(world,dt) {
     if(sliding){
       const blocked=(p.x-oldX)*p.slideDirection<Math.abs(moveX)-1e-7;
       if(blocked)p.vx=0;
-      p.slide=blocked||!landingSurface?0:Math.max(0,p.slide-dt);
+      p.slide=blocked||assisted?0:Math.max(0,p.slide-dt);
     }
     if(sliding||p.slideAudio)updateSlideAudio(world,map,p,landingSurface);
     updateFootsteps(world,map,p,!wasAirborne&&oldY===p.y?landingSurface:null,oldX,moveX,dt);

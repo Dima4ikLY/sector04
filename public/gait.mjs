@@ -100,7 +100,7 @@ export function gaitPose(p,time){
   const run=ease(clamp(speed/240,0,1)),crouchWalk=ease(clamp(speed/140,0,1)),crawl=ease(clamp(speed/65,0,1));
   const height=visualStanceHeight(p),lowering=ease(clamp((58-height)/18,0,1)),prone=ease(clamp((40-height)/17,0,1));
   const slideDirection=p.slideDirection||0;
-  const slide=!dead&&!airborne&&slideDirection&&p.slide>0
+  const slide=!dead&&slideDirection&&p.slide>0
     ? ease(clamp((SLIDE_DURATION-p.slide)/.075,0,1))*ease(clamp(p.slide/.11,0,1))*(1-prone)
     : 0;
   const runPhase=phaseAt(distance,runStep.cycle)*tau,crouchPhase=phaseAt(distance,crouchStep.cycle)*tau;
