@@ -470,7 +470,7 @@ function fireWeapon(world,map,obstacles,player,gun,firedAt){
     const contact=bulletSurfaceContact(surface,from.x,from.y,dx,dy);
     if(!obstruction||contact.fraction<obstruction.contact.fraction)obstruction={surface,contact};
   }
-  const damage=player.coopEnemy?Math.round(gun.damage*(.1+world.coop.wave*.1)):gun.damage*(player.bot?(world.match?.botDamage??0.4):1);
+  const damage=player.coopEnemy?Math.round(gun.damage*(.1+world.coop.wave*.1)):Math.round(gun.damage*(player.bot?(world.match?.botDamage??0.4):1));
   const critical=gun.projectile!=='rocket'&&player.buffs.critical>0;
   if(critical)player.buffs.critical=0;
   if(obstruction){
@@ -485,7 +485,7 @@ function fireWeapon(world,map,obstacles,player,gun,firedAt){
   for(let pellet=0;pellet<gun.pellets;pellet++){
     const angle=shot.angle+(Math.random()-.5)*gun.spread*2;
     const criticalPellet=critical&&pellet===0;
-    const pelletDamage=criticalPellet?damage*PICKUP_TYPES.critical.multiplier:damage;
+    const pelletDamage=criticalPellet?Math.round(damage*PICKUP_TYPES.critical.multiplier):damage;
     world.bullets.push({id:++world.serial,shotId:shot.id,firedAt,originX:origin.x,originY:origin.y,
       x:origin.x,y:origin.y,vx:Math.cos(angle)*gun.speed,vy:Math.sin(angle)*gun.speed,
       owner:player.id,weapon:player.weapon,kind:gun.projectile,damage:pelletDamage,life:gun.lifetime??1.3,age:0,color:player.color,
@@ -513,12 +513,14 @@ function emitPlayerHit(world,bullet,victim,{x,y,time,directionX},zone,surface){
   Object.assign(hit,{victim:victim.id,zone,surface,shotId,directionX});
 }
 function damage(world,victim,amount,owner,impactX=0,impactY=1,zone) {
+  // Every hit deals whole HP so health, hit numbers and the scoreboard stay integer.
+  amount=Math.round(amount);
   if(victim.dead>0||victim.shield>0||amount<=0)return;
   const bonusDamage=Math.min(victim.bonusArmor,amount);
   const helmetDamage=zone==='head'?Math.min(victim.helmet,amount-bonusDamage):0;
   const vestDamage=Math.min(victim.armor,amount-bonusDamage-helmetDamage);
   const armorDamage=bonusDamage+helmetDamage+vestDamage;
-  const dealt=Math.min(victim.hp,amount-armorDamage);
+  const dealt=Math.round(Math.min(victim.hp,amount-armorDamage));
   if(!dealt&&!armorDamage)return;
   victim.bonusArmor-=bonusDamage;
   if(victim.bonusArmor===0)victim.buffs.armor=0;
@@ -901,7 +903,7 @@ export function step(world,dt) {
           hitListener=hit;
           const x=startX+dx*fraction,y=startY+dy*fraction,time=world.time+dt-elapsed;
           const zone=playerHitZone(hit,x,y);
-          const amount=b.damage*hitDamageMultiplier[zone];
+          const amount=Math.round(b.damage*hitDamageMultiplier[zone]);
           const surface=damage(world,hit,amount,b.owner,b.vx,b.vy,zone);
           if(surface)emitPlayerHit(world,b,hit,{x,y,time,directionX:b.vx/speed},zone,surface);
           world.effects.push({id:++world.serial,type:'hit',x,y,nx:-b.vx/speed,ny:-b.vy/speed,
