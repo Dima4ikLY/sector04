@@ -370,7 +370,9 @@ export function buildWorldModel(map) {
     return {definition,group,body,left,right,arrow,indicators};
   }
 
-  const mechanisms=(map.mechanisms||[]).map(makeMechanism);
+  const mechanisms=(map.mechanisms||[])
+    .filter(({type})=>type==='door'||type==='lift')
+    .map(makeMechanism);
   function updateMechanisms(states=[]) {
     for(const model of mechanisms){
       const {definition,group,left,right}=model;

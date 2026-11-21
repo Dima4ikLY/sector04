@@ -4,7 +4,7 @@ import {createArmory} from './shop.mjs';
 import {START_WEAPON,armorForEquipment,helmetForEquipment,ranks,rankIndex,rankUnlocks,rankUnlocksBetween} from './catalog.mjs';
 import {getMap,getMapsForMode} from './maps.mjs';
 import {AimCamera,sampleBlastShake} from './camera.mjs';
-import {buildScenery,drawMapMechanisms,drawMapCovers,drawTidalBridge,drawTidalWater} from './scenery.mjs';
+import {buildScenery,drawMapMechanisms,drawMapCovers,drawRiftAtmosphere,drawTidalBridge,drawTidalWater} from './scenery.mjs';
 import {isConcealedFrom} from './covers.mjs';
 import {teamSpawnColors as teamColors,teamFightColors} from './map-detail.mjs';
 import {mapWithMechanisms,nearbyMechanism} from './map-interactives.mjs';
@@ -61,6 +61,7 @@ const shouldDrawArena=createFrameLimiter();
 const motion=new SnapshotBuffer();
 const arenaSkinEffects=createSkinEffects();
 const camera=new AimCamera(),audio=new WeaponAudio();
+let lastPortalCamera;
 const battleScore=new BattleScore();
 let actors3D=preferences.renderer==='3d'?createCharacterScene($('actors3d'),{report:true}):null;
 const feedback=new CombatFeedback();
@@ -215,7 +216,12 @@ function syncMapLabels(mapId){
   $('tidalDown').hidden=!map.tidal;
   $('tidalControlsHint').hidden=!map.tidal;
   $('activeMapName').textContent=map.name;$('activeMapDetails').textContent=map.terrain;
-  $('interactionHelp').hidden=!map.mechanisms?.length;
+  const interactionHelp=$('interactionHelp');
+  const interactions=new Set(map.mechanisms?.map(mechanism=>mechanism.type));
+  const interactionLabels=[['door','дверь'],['lift','лифт'],['portal','портал']]
+    .filter(([type])=>interactions.has(type)).map(([,label])=>label);
+  interactionHelp.hidden=!interactionLabels.length;
+  interactionHelp.lastChild.textContent=` ${interactionLabels.join(' / ')}`;
   const mode=session?.coop?'ЭКСПЕДИЦИЯ':session?.range?'СТРЕЛЬБИЩЕ':session?.training?'ТРЕНИРОВКА':session?'ОНЛАЙН':'ПОЛИГОН';
   $('arenaTitle').textContent=`${mode} / ${map.name.toUpperCase()}`;
   const match=session?.match;
@@ -839,8 +845,8 @@ document.querySelectorAll('[data-control]:not([data-control="weapon"])').forEach
   });
 });
 function arenaViewY(map,p){
-  const bottom=map.height-H/(map.zoom||1);
-  if(!map.tidal||!p)return bottom;
+  const bottom=Math.max(0,map.height-H/(map.zoom||1));
+  if(!(map.tidal||map.followY)||!p)return bottom;
   return Math.min(bottom,Math.max(0,p.y-H/(map.zoom||1)*.60));
 }
 function pointerAimAngle(p,map){
@@ -1265,8 +1271,12 @@ function drawArenaBackdrop(map,viewX,viewY,baseX,baseY,zoom){
   ctx.drawImage(bg,viewX*scale,viewY*scale,width*scale,height*scale,0,0,W,H);
   if(map.tidal)ctx.restore();
 }
-function drawAtmosphere(map,time){
+function drawAtmosphere(map,time,view){
   if(!preferences.effects||reducedMotion.matches)return;
+  if(map.weather==='rift'){
+    drawRiftAtmosphere(ctx,map,time,view);
+    return;
+  }
   const rain=map.weather==='rain'||map.id==='harbor';
   const snow=map.weather==='snow'||map.id==='observatory';
   const count=rain?40:snow?42:map.id==='dungeon'?14:30;
@@ -1312,15 +1322,23 @@ function updateInteractionPrompt(map){
   if(!nearby)return;
   const {definition,state}=nearby;
   const moving=definition.type==='lift'&&state.y!==state.target;
+  const cooldown=definition.type==='portal'?(me.portalCooldown??0):0;
+  const unavailable=moving||cooldown>0;
   let label;
-  if(definition.type==='door')label=state.target===1?'Закрыть дверь':'Открыть дверь';
+  if(definition.type==='portal'){
+    if(cooldown>0){
+      const seconds=(Math.ceil(cooldown*10)/10).toFixed(1).replace('.',',');
+      label=`${definition.name??'Портал'} · ${seconds} с`;
+    }else label=definition.name?`Войти · ${definition.name}`:'Войти в портал';
+  }
+  else if(definition.type==='door')label=state.target===1?'Закрыть дверь':'Открыть дверь';
   else if(moving)label='Лифт движется';
   else{
     const landing=me.y<(definition.top+definition.bottom)/2?definition.top:definition.bottom;
     label=state.y!==landing?'Вызвать лифт':state.y===definition.bottom?'Поднять лифт':'Опустить лифт';
   }
-  interactionButton.disabled=moving;
-  interactionKey.hidden=touch||moving;
+  interactionButton.disabled=unavailable;
+  interactionKey.hidden=touch||unavailable;
   if(interactionText.textContent!==label)interactionText.textContent=label;
 }
 function drawScoreboard(){
@@ -1383,6 +1401,8 @@ function render(t){
   updateInteractionPrompt(map);
   const aimX=session&&!touch?mouse.x:W/2+Math.cos(focus?.angle??0)*W/2;
   const zoom=map.zoom||1,baseY=arenaViewY(map,focus);
+  if(Number.isFinite(focus?.portalAt)&&focus.portalAt!==lastPortalCamera)camera.reset();
+  lastPortalCamera=focus?.portalAt;
   const baseX=camera.update(focus,aimX,dt,map.width,zoom);
   // Shake all world layers together. Input and the minimap keep the base camera.
   const shake=session&&!world.ended&&!lost&&preferences.effects&&!reducedMotion.matches
@@ -1405,8 +1425,13 @@ function render(t){
     if(preferences.effects&&!reducedMotion.matches)drawTidalWater(ctx,map,{time:t*.001,view,background:bg});
     drawTidalBridge(ctx,map,scene.bridgeHealth);
   }
-  drawAtmosphere(map,t);
-  if(!draw3D||map.backdrop?.aligned)drawMapMechanisms(ctx,map,scene.mechanisms);
+  drawAtmosphere(map,t,view);
+  if(map.mechanisms?.length){
+    drawMapMechanisms(ctx,map,scene.mechanisms,{
+      time:t,view,animated:preferences.effects&&!reducedMotion.matches,
+      onlyPortals:draw3D&&!map.backdrop?.aligned
+    });
+  }
   const spawnOpacity=new Map();
   if(skinEffects){
     const ambientPlayers=[];

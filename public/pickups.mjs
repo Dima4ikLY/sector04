@@ -54,6 +54,10 @@ const freeForAllAnchors={
 
 // Team layouts have identical supplies on both flanks and contested items on the center line.
 const teamAnchors={
+  'meridian-rift':{
+    flank:[['small',445,1160],['large',629,466],['speed',1066,1160],['armor',950,820],['transparent',201,1160]],
+    center:[['critical',304]]
+  },
   'midnight-freight':{
     flank:[['small',650,772],['large',371,398],['speed',290,493]],
     center:[['armor',772]]

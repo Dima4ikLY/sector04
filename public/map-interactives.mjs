@@ -1,5 +1,9 @@
+import {polygonContact} from './geometry.mjs';
+
 const doorRate=2.6;
 const contactTolerance=.01;
+const portalCooldown=1.5;
+export const PORTAL_FLASH_DURATION=.65;
 const approach=(value,target,delta)=>value<target?Math.min(target,value+delta):Math.max(target,value-delta);
 const distanceToSpan=(value,low,high)=>Math.max(low-value,value-high,0);
 const cyclesAutomatically=definition=>Number.isFinite(definition.autoCycle)&&definition.autoCycle>0;
@@ -7,6 +11,7 @@ const cyclesAutomatically=definition=>Number.isFinite(definition.autoCycle)&&def
 export function createMechanisms(map){
   return (map.mechanisms??[]).map(definition=>{
     const {id,type,initiallyOpen,top,bottom,autoCycle,startAtTop}=definition;
+    if(type==='portal')return {id,type,flash:0};
     if(type==='lift'){
       const automatic=cyclesAutomatically(definition);
       const y=automatic&&startAtTop?top:bottom;
@@ -19,6 +24,7 @@ export function createMechanisms(map){
 
 export function mechanismRect(definition,state){
   const {x,w,h}=definition;
+  if(definition.type==='portal')return null;
   if(definition.type==='lift')return {x,y:state.y,w,h};
   const height=h*(1-state.openness);
   return height>0?{x,y:definition.y,w,h:height}:null;
@@ -48,11 +54,15 @@ export function nearbyMechanism(map,states,player){
   let nearest=null,bestDistance=Infinity;
   for(const definition of map.mechanisms??[]){
     if(definition.type==='lift'&&cyclesAutomatically(definition))continue;
+    if(definition.type==='portal'&&player.bot)continue;
     const state=states?.find(item=>item.id===definition.id);
     if(!state)continue;
     const dx=distanceToSpan(player.x,definition.x,definition.x+definition.w);
     let dy;
-    if(definition.type==='door'){
+    if(definition.type==='portal'){
+      dy=distanceToSpan(player.y-player.stanceHeight/2,definition.y,definition.y+definition.h);
+      if(dx>24||dy>20)continue;
+    }else if(definition.type==='door'){
       const bodyY=player.y-player.stanceHeight/2;
       dy=distanceToSpan(bodyY,definition.y,definition.y+definition.h);
       if(dx>86||dy>44)continue;
@@ -83,11 +93,43 @@ export function triggerMechanism({definition,state},player,players,halfWidth){
     state.target=1-state.target;
     return true;
   }
-  if(cyclesAutomatically(definition)||state.y!==state.target)return false;
+  if(definition.type!=='lift'||cyclesAutomatically(definition)||state.y!==state.target)return false;
   const {top,bottom}=definition;
   const landing=Math.abs(player.y-top)<Math.abs(player.y-bottom)?top:bottom;
   state.target=state.y===landing?(landing===top?bottom:top):landing;
   return true;
+}
+
+export function triggerPortal({definition,state},map,states,player,players,halfWidth,standing,time){
+  if(definition.type!=='portal'||player.dead>0||player.portalCooldown>0)return null;
+  const target=map.mechanisms.find(portal=>portal.id===definition.targetId&&portal.type==='portal');
+  if(!target||target===definition||target.targetId!==definition.id)return null;
+  const targetState=states.find(item=>item.id===target.id);
+  if(!targetState)return null;
+
+  const x=target.exitX??target.x+target.w/2,exitY=target.exitY??target.y+target.h;
+  const width=Math.max(halfWidth(player),standing.halfWidth);
+  const height=Math.max(player.stanceHeight,standing.height);
+  const margin=width+3;
+  if(!Number.isFinite(x)||!Number.isFinite(exitY)||x<margin||x>map.width-margin||exitY<height||exitY>map.height)return null;
+  const surfaces=[...map.platforms,...(map.solids??[])];
+  const floor=surfaces.find(surface=>!surface.vertices&&!surface.mechanismId&&
+    Math.abs(exitY-surface.y)<=contactTolerance&&x-width>=surface.x&&x+width<=surface.x+surface.w);
+  if(!floor)return null;
+
+  const y=floor.y,body={x,y,stanceHeight:height};
+  const center={x,y:y-height/2};
+  if(surfaces.some(rect=>rect.vertices
+    ? polygonContact(center,center,rect,width,height/2)
+    : overlapsBody(rect,body,width)))return null;
+  if(players.some(other=>other!==player&&other.dead<=0&&overlapsBody({
+    x:other.x-halfWidth(other),y:other.y-other.stanceHeight,w:halfWidth(other)*2,h:other.stanceHeight
+  },body,width)))return null;
+
+  Object.assign(player,{x,y,vx:0,vy:0,jumps:0,portalCooldown,portalAt:time});
+  state.flash=targetState.flash=PORTAL_FLASH_DURATION;
+  state.flashAt=targetState.flashAt=time;
+  return target;
 }
 
 function emitMotion(emit,definition,kind,y,elapsed=0){
@@ -98,6 +140,10 @@ export function advanceMechanisms(map,states,players,halfWidth,dt,emit){
   for(const definition of map.mechanisms??[]){
     const state=states.find(item=>item.id===definition.id);
     if(!state)continue;
+    if(definition.type==='portal'){
+      if(state.flash>0)state.flash=Math.max(0,state.flash-dt);
+      continue;
+    }
     if(definition.type==='door'){
       if(state.openness===state.target)continue;
       if(state.target===0&&closingPathOccupied(definition,players,halfWidth))state.target=1;

@@ -65,6 +65,16 @@ export function drawMinimap(ctx,{map,physicalMap,players=[],viewX,viewY,viewWidt
   const cameraX=fieldX+viewX*scaleX,cameraY=fieldY+viewY*scaleY;
   ctx.fillStyle='#ffd39818';ctx.fillRect(cameraX,cameraY,viewWidth*scaleX,viewHeight*scaleY);
   ctx.strokeStyle='#ffd398';ctx.lineWidth=1.2;ctx.strokeRect(cameraX,cameraY,viewWidth*scaleX,viewHeight*scaleY);
+  ctx.font='700 7px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  for(const portal of map.mechanisms??[]){
+    if(portal.type!=='portal')continue;
+    const x=snap(fieldX+(portal.x+portal.w/2)*scaleX),y=snap(fieldY+(portal.y+portal.h*.34)*scaleY);
+    const color=portal.color??'#75ddff';
+    ctx.beginPath();ctx.roundRect(x-5,y-4.5,10,9,2);
+    ctx.fillStyle='#0c1522';ctx.fill();
+    ctx.strokeStyle=color;ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle=color;ctx.fillText(portal.pair??'·',x,y);
+  }
   for(const p of players){
     if(!p||p.dead>0)continue;
     const dotX=Math.max(fieldX+2,Math.min(fieldX+fieldWidth-2,fieldX+p.x*scaleX));

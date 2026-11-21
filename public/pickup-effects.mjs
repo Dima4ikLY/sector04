@@ -53,7 +53,7 @@ export function drawMapPickups(ctx,pickups,view,{time,animate}){
       ctx.strokeStyle='#101a24b8';ctx.lineWidth=3;
       ctx.beginPath();ctx.ellipse(0,9,10,3.6,0,0,TAU);ctx.stroke();
       ctx.strokeStyle=type.color;ctx.globalAlpha=.59;ctx.lineWidth=1.6;
-      const progress=1-pickup.remaining*1000/type.respawnMs;
+      const progress=1-pickup.remaining*1000/(pickup.respawnMs??type.respawnMs);
       if(progress>0){
         ctx.beginPath();ctx.ellipse(0,9,10,3.6,0,-Math.PI/2,-Math.PI/2+TAU*progress);ctx.stroke();
       }

@@ -1,5 +1,10 @@
 // Foliage conceals fighters, but is never a physical collider for shots.
 export const coverDefinitions={
+  'meridian-rift':[
+    {x:126,y:1160,w:150,h:108},{x:2384,y:1160,w:150,h:108},
+    {x:337,y:812,w:112,h:88},{x:2211,y:820,w:94,h:88},
+    {x:740,y:636,w:116,h:86},{x:1804,y:636,w:116,h:86}
+  ],
   'midnight-freight':[
     {x:670,y:772,w:106,h:86},{x:986,y:772,w:120,h:92},{x:1460,y:772,w:116,h:84}
   ],

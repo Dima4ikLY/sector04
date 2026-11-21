@@ -1,7 +1,7 @@
 import {ROUND,SLIDE_DURATION,clamp,weapons} from './engine.mjs';
 import {getMap} from './maps.mjs';
 import {advanceGrenade,GRENADE_EFFECT_DURATION,GRENADE_FUSE} from './grenade.mjs';
-import {mapWithMechanisms} from './map-interactives.mjs';
+import {mapWithMechanisms,PORTAL_FLASH_DURATION} from './map-interactives.mjs';
 import {segmentHitsRect} from './geometry.mjs';
 import {PICKUP_NOTICE_DURATION,PICKUP_TYPES} from './pickups.mjs';
 
@@ -124,6 +124,7 @@ export class SnapshotBuffer {
         // A new life switches directly to its authoritative spawn position.
         return occurred(p.spawnAt,worldTime)?p:old;
       }
+      if(Number.isFinite(p.portalAt)&&p.portalAt!==old.portalAt)return occurred(p.portalAt,worldTime)?p:old;
       if(Math.hypot(p.x-old.x,p.y-old.y)>120)return alpha<1?old:p;
       const x=mix(old.x,p.x,alpha),y=mix(old.y,p.y,alpha);
       const vx=Number.isFinite(old.vx)&&Number.isFinite(p.vx)?mix(old.vx,p.vx,alpha):p.vx;
@@ -139,6 +140,11 @@ export class SnapshotBuffer {
     const mechanisms=b.world.mechanisms?.map((state,index)=>{
       const old=a.world.mechanisms?.[index];
       if(old?.id!==state.id)return state;
+      if(state.type==='portal'){
+        const pulse=occurred(state.flashAt,worldTime)?state:old;
+        const flash=Number.isFinite(pulse.flashAt)?Math.max(0,PORTAL_FLASH_DURATION+worldTime-pulse.flashAt):0;
+        return {...pulse,flash};
+      }
       return state.type==='door'
         ? {...state,openness:mix(old.openness,state.openness,alpha)}
         : {...state,y:mix(old.y,state.y,alpha)};
@@ -187,7 +193,7 @@ function samplePickups(a,b,time){
     }
     const old=oldById.get(next.id);
     if(!old){visible.push(next);continue;}
-    const cooldown=PICKUP_TYPES[next.kind].respawnMs/1000;
+    const cooldown=(next.respawnMs??PICKUP_TYPES[next.kind].respawnMs)/1000;
     const beforeCollection=next.remaining+b.time-time;
     if(next.remaining>0&&beforeCollection<=cooldown+1e-8){
       visible.push({...next,remaining:Math.min(cooldown,beforeCollection)});

@@ -110,6 +110,9 @@ const battleCueProfiles=new Map([
     [.21,.24,1047,1047,.47],[.21,.24,659,659,.21]
   ]}]
 ]);
+const portalCue={overtones:[[1.51,.20],[2.02,.15]],notes:[
+  [0,.22,170,460,.42],[.035,.21,505,1250,.31],[.14,.31,940,370,.30]
+]};
 
 function surfaceIndex(surface){
   const index=surfaces.indexOf(surface);
@@ -691,7 +694,7 @@ export class WeaponAudio {
     const isBulletFlyby=event.kind==='bullet-flyby';
     const isGrenadeBounce=event.kind==='grenade-bounce';
     const isGrenadeThrow=event.kind==='grenade-throw';
-    const isPickup=event.kind==='pickup';
+    const isPickup=event.kind==='pickup',isPortal=event.kind==='portal';
     const ownSource=event.owner!=null&&event.owner===listener.id;
     const centeredOnListener=ownSource&&(isPickup||isGrenadeThrow||isWeaponHandling||isRespawn);
     if(isPickup&&!Object.hasOwn(pickupProfiles,event.item))return;
@@ -756,6 +759,9 @@ export class WeaponAudio {
     }else if(isPickup){
       range=560;
       level=ownSource?.82:.43;
+    }else if(isPortal){
+      range=850;
+      level=ownSource?.66:.50;
     }else if(isMechanism){
       range=1200;
       level=.74;
@@ -862,6 +868,7 @@ export class WeaponAudio {
         else if(isGrenadeThrow)data=synthesizeGrenadeThrow(grenadeThrowClip,c.sampleRate);
         else if(isBulletFlyby)data=synthesizeBulletFlyby(bulletFlybyClip,c.sampleRate);
         else if(isPickup)data=synthesizeNotes(pickupProfiles[event.item],c.sampleRate);
+        else if(isPortal)data=synthesizeNotes(portalCue,c.sampleRate);
         else data=synthesizeSound(event.kind,event.weapon,c.sampleRate);
         buffer=c.createBuffer(1,data.length,c.sampleRate);buffer.copyToChannel(data,0);this.buffers.set(key,buffer);
       }

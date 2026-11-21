@@ -486,7 +486,43 @@ const polarStation={
   ]
 };
 
-export const maps=[...freeForAllMaps,...teamMaps,nightFoundry,tidalStation,midnightFreight,polarStation];
+const meridianRift={
+  id:'meridian-rift',name:'Разлом Меридиана',number:'23',zone:'MERIDIAN RIFT',
+  width:2660,height:1330,theme:'observatory',weather:'rift',riftGlow:{x:1410,y:640},
+  followY:true,coverArt:'steam',jumpSpeed:740,fixedBuffs:30,
+  terrain:'Три пары порталов, грузовой лифт и вентиляционные ниши',
+  description:'Голубые порталы связывают нижние мостки, фиолетовые и янтарные ведут на верхнюю галерею. Ищите усиления на разных ярусах.',
+  backdrop:{file:'meridian-rift.png',aligned:true},
+  modes:['ffa','1v1','2v2','3v3'],
+  // The collision surfaces follow the painted decks at the artwork's 2:1 aspect ratio.
+  platforms:[
+    {x:0,y:1160,w:2660,h:46,kind:'floor'},
+    {x:45,y:812,w:420,h:29},{x:465,y:820,w:675,h:24},
+    {x:1657,y:820,w:659,h:24},{x:2316,y:812,w:344,h:29},
+    {x:464,y:636,w:618,h:24},{x:1743,y:636,w:563,h:24},
+    {x:463,y:466,w:545,h:25},{x:1853,y:466,w:453,h:25},
+    {x:698,y:304,w:1348,h:28}
+  ],
+  mechanisms:[
+    {id:'meridian-lift',type:'lift',name:'Грузовой лифт',x:1268,w:124,h:20,top:815,bottom:1160,speed:174,autoCycle:1.2},
+    {id:'meridian-bridge-west',type:'portal',targetId:'meridian-bridge-east',pair:'I',color:'#64eaff',name:'Портал на восточные мостки',x:550,y:708,w:80,h:112},
+    {id:'meridian-bridge-east',type:'portal',targetId:'meridian-bridge-west',pair:'I',color:'#64eaff',name:'Портал на западные мостки',x:2030,y:708,w:80,h:112},
+    {id:'meridian-west-floor',type:'portal',targetId:'meridian-east-gallery',pair:'II',color:'#db9aff',name:'Портал на восток галереи',x:680,y:1048,w:80,h:112},
+    {id:'meridian-east-gallery',type:'portal',targetId:'meridian-west-floor',pair:'II',color:'#db9aff',name:'Портал в западный цех',x:1720,y:192,w:80,h:112},
+    {id:'meridian-east-floor',type:'portal',targetId:'meridian-west-gallery',pair:'III',color:'#ffbc70',name:'Портал на запад галереи',x:1900,y:1048,w:80,h:112},
+    {id:'meridian-west-gallery',type:'portal',targetId:'meridian-east-floor',pair:'III',color:'#ffbc70',name:'Портал в восточный цех',x:860,y:192,w:80,h:112}
+  ],
+  spawns:[
+    {x:352,y:1160},{x:2308,y:1160},{x:788,y:820},
+    {x:1872,y:820},{x:680,y:466},{x:1980,y:466}
+  ],
+  teamSpawns:[
+    [{x:352,y:1160},{x:788,y:820},{x:680,y:466}],
+    [{x:2308,y:1160},{x:1872,y:820},{x:1980,y:466}]
+  ]
+};
+
+export const maps=[...freeForAllMaps,...teamMaps,nightFoundry,tidalStation,midnightFreight,polarStation,meridianRift];
 export const getMap=id=>maps.find(map=>map.id===id)||maps[0];
 export function getMapsForMode(mode='ffa'){
   return maps.filter(map=>map.modes?map.modes.includes(mode):(map.mode??'ffa')===mode);

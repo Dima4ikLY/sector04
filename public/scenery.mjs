@@ -324,6 +324,7 @@ function atmosphere(ctx,map,look,photo) {
 function mechanismFixtures(ctx,map,look) {
   for(const definition of map.mechanisms||[]){
     const {x,w,type}=definition;
+    if(type==='portal')continue;
     if(type==='door'){
       const {y,h}=definition;
       rect(ctx,x-4,y-8,w+8,9,look.backdropInk);
@@ -342,9 +343,105 @@ function mechanismFixtures(ctx,map,look) {
   }
 }
 
-export function drawMapMechanisms(ctx,map,states=[]) {
+const portalTau=Math.PI*2;
+function drawPortal(ctx,definition,state,time,animated){
+  const {x,y,w,h}=definition,color=definition.color??'#75ddff';
+  const cx=x+w/2,cy=y+h*.49,rx=w*.43,ry=h*.44;
+  const phase=animated?time*.001:0;
+  const flash=Math.min(1,Math.max(0,(state?.flash??0)/.65));
+  const pulse=animated?1+Math.sin(phase*2.4)*.045:1;
+  const width=rx*pulse;
+
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.save();
+  ctx.scale(width,ry);
+  const field=ctx.createRadialGradient(0,0,0,0,0,1.58);
+  field.addColorStop(0,'#07101e12');
+  field.addColorStop(.36,color+'25');
+  field.addColorStop(.59,color+(flash>.5?'a8':'75'));
+  field.addColorStop(.73,color+'34');
+  field.addColorStop(1,color+'00');
+  ctx.fillStyle=field;
+  ctx.fillRect(-1.58,-1.58,3.16,3.16);
+  ctx.restore();
+
+  ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.ellipse(0,0,width,ry,0,0,portalTau);
+  ctx.lineWidth=animated?4+flash*3:4;
+  ctx.strokeStyle=color+'a8';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(0,0,width-1,ry-1,0,0,portalTau);
+  ctx.lineWidth=1.25;
+  ctx.strokeStyle='#ecfaffd0';
+  ctx.stroke();
+  for(let i=0;i<5;i++){
+    const at=i*portalTau/5+phase*.68;
+    ctx.beginPath();
+    ctx.ellipse(0,0,width+6,ry+7,0,at,at+.57);
+    ctx.lineWidth=2.15;
+    ctx.strokeStyle=i%2===0?color:'#eefaffbb';
+    ctx.stroke();
+  }
+  if(animated){
+    for(let i=0;i<13;i++){
+      const at=i*2.39996+phase*(i%2===0?.72:-.53);
+      const radius=1.04+Math.sin(i+phase*1.6)*.14;
+      const px=Math.cos(at)*width*radius,py=Math.sin(at)*ry*radius;
+      ctx.fillStyle=i%3===0?'#effbffcc':color+'a6';
+      const size=i%3===0?2:1.25;
+      ctx.fillRect(px,py,size,size);
+    }
+    if(flash>0){
+      const ring=1+(1-flash)*.8;
+      ctx.save();
+      ctx.beginPath();ctx.ellipse(0,0,width*ring,ry*ring,0,0,portalTau);
+      ctx.globalAlpha*=flash*.62;
+      ctx.lineWidth=2+flash*3;ctx.strokeStyle=color;ctx.stroke();
+      ctx.restore();
+    }
+  }
+  // The pair identifier remains legible when particle effects are disabled.
+  if(definition.pair){
+    ctx.font='700 12px system-ui, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    const labelY=-ry-14,labelWidth=Math.max(22,ctx.measureText(definition.pair).width+12);
+    ctx.fillStyle='#101923ee';ctx.fillRect(-labelWidth/2,labelY-8,labelWidth,16);
+    ctx.fillStyle=color;ctx.fillText(definition.pair,0,labelY);
+  }
+  ctx.restore();
+}
+
+export function drawRiftAtmosphere(ctx,map,time,view){
+  const {x=map.width*.5,y=map.height*.57}=map.riftGlow??{};
+  const width=Math.min(570,map.width*.26),rise=Math.min(580,map.height*.55);
+  const phase=time*.001;
+  ctx.save();
+  for(let i=0;i<38;i++){
+    const progress=(phase*(.13+i%4*.032)+i*.618)%1;
+    const px=x+(Math.sin(i*2.39996)*.48+Math.sin(phase+i)*.075)*width;
+    const py=y+rise*.35-progress*rise;
+    if(px<view.x-8||px>view.x+view.width+8||py<view.y-8||py>view.y+view.height+8)continue;
+    ctx.globalAlpha=Math.sin(progress*Math.PI)*(i%3===0?.68:.40);
+    const color=i%3===0?'#aeefff':i%3===1?'#85e9de':'#dcc4ff';
+    if(i%4===0)line(ctx,px,py,px-1,py+5,color,1);
+    else{ctx.fillStyle=color;ctx.fillRect(px,py,i%3===0?2:1.2,i%3===0?2:1.2);}
+  }
+  ctx.restore();
+}
+
+export function drawMapMechanisms(ctx,map,states=[],{time=0,animated=false,view,onlyPortals=false}={}) {
   const look=arenaLooks[map.theme];
   for(const definition of map.mechanisms||[]){
+    if(definition.type==='portal'){
+      const {x,y,w,h}=definition,margin=Math.max(w,h)*.6;
+      if(!view||x+w+margin>=view.x&&x-margin<=view.x+view.width&&y+h+margin>=view.y&&y-margin<=view.y+view.height){
+        drawPortal(ctx,definition,states.find(state=>state.id===definition.id),time,animated);
+      }
+      continue;
+    }
+    if(onlyPortals)continue;
     const {body,status,up}=mechanismAppearance(definition,states.find(state=>state.id===definition.id));
     const color=mechanismLights[status];
     if(definition.type==='door'){

@@ -3,7 +3,7 @@ import {launchGrenade,advanceGrenade,GRENADE_EFFECT_DURATION} from './grenade.mj
 import {rankPlayers} from './combat.mjs';
 import {MEDKIT_LIMIT,medkits} from './catalog.mjs';
 import {hasLineOfSight,polygonContact,segmentHitsRect} from './geometry.mjs';
-import {advanceMechanisms,createMechanisms,mapWithMechanisms,nearbyMechanism,triggerMechanism} from './map-interactives.mjs';
+import {advanceMechanisms,createMechanisms,mapWithMechanisms,nearbyMechanism,triggerMechanism,triggerPortal} from './map-interactives.mjs';
 import {BUFF_SPAWN,getMapBuffSpawns,getMapPickups,PICKUP_NOTICE_DURATION,PICKUP_TYPES} from './pickups.mjs';
 import {teamBotInput} from './team-bots.mjs';
 import {deathFallContactDelay} from './death-motion.mjs';
@@ -63,12 +63,15 @@ export const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
 export function createWorld(mapId='foundry',{range=false,coop=false,teamSize=0,timeSeconds}={}) {
   const map=getMap(mapId);
   const mission=coop?{phase:'waiting',wave:0,totalWaves:COOP_WAVES,enemiesLeft:0,countdown:0,hostId:null,defeated:0}:null;
+  const fixedRespawnMs=map.fixedBuffs===true?30_000:
+    Number.isFinite(map.fixedBuffs)&&map.fixedBuffs>0?map.fixedBuffs*1000:0;
   const pickups=range?[]:getMapPickups(map)
-    .filter(pickup=>Object.hasOwn(medkits,pickup.kind))
-    .map(placement=>({...placement,remaining:0}));
+    .filter(pickup=>Object.hasOwn(medkits,pickup.kind)||fixedRespawnMs&&buffKinds.includes(pickup.kind))
+    .map(placement=>Object.hasOwn(medkits,placement.kind)?{...placement,remaining:0}:
+      {...placement,remaining:0,respawnMs:fixedRespawnMs});
   const world={mapId:map.id,range,coop:mission,mechanisms:createMechanisms(map),pickups,time:Number.isFinite(timeSeconds)&&timeSeconds>0?timeSeconds:ROUND,players:[],bullets:[],grenades:[],effects:[],audioEvents:[],combatEvents:[],feed:[],ended:false,serial:0};
   if(map.tidal)world.bridgeHealth=Object.fromEntries(map.tidal.bridge.map(section=>[section.id,section.hp]));
-  if(!range)mapBuffs.set(world,{locations:getMapBuffSpawns(map),nextAt:ROUND-BUFF_SPAWN.initialDelay,active:null,previous:null});
+  if(!range&&!fixedRespawnMs)mapBuffs.set(world,{locations:getMapBuffSpawns(map),nextAt:ROUND-BUFF_SPAWN.initialDelay,active:null,previous:null});
   if(teamSize===1||teamSize===2||teamSize===3)world.teams={size:teamSize,scores:[0,0],winner:null};
   return world;
 }
@@ -139,6 +142,8 @@ function respawn(p,world) {
   delete p.landSpeed;
   delete p.weaponAt;
   delete p.deathImpact;
+  delete p.portalAt;
+  delete p.portalCooldown;
   pendingDeathFalls.delete(p);
   footstepProgress.delete(p);
   spawnSettling.add(p);
@@ -602,6 +607,29 @@ function interactionPressed(player,input){
   player.lastInteraction=input;
   return true;
 }
+function interact(world,map,mechanisms,mechanism,player,time){
+  const {definition}=mechanism;
+  if(definition.type!=='portal')return triggerMechanism(mechanism,player,world.players,playerHalfWidth);
+  const standing=map.tidal?{height:72,halfWidth:20}:stances.stand;
+  const target=triggerPortal(mechanism,map,mechanisms,player,world.players,playerHalfWidth,standing,time);
+  if(!target)return false;
+
+  player.slide=0;
+  player.slideDirection=0;
+  player.input.slide=0;
+  player.airborne=false;
+  player.jetActive=false;
+  delete player.slideAudio;
+  delete player.airAt;
+  delete player.landAt;
+  delete player.landSpeed;
+  if(map.tidal)Object.assign(player,{dropTime:0,waterLeap:false,onSlope:false,slopeSpeed:0});
+  footstepProgress.delete(player);
+  for(const portal of [definition,target]){
+    audioEvent(world,'portal',{id:player.id,x:portal.x+portal.w/2,y:portal.y+portal.h/2},undefined,time).portalId=portal.id;
+  }
+  return true;
+}
 function takeMedkitInput(player){
   const {medkit:kind,medkitSeq:sequence}=player.input;
   if(kind===undefined&&sequence===undefined)return null;
@@ -702,7 +730,8 @@ function updatePickups(world,obstacles,dt){
     candidates.sort((a,b)=>a.distance-b.distance);
     for(const {player} of candidates){
       if(!grantPickup(world,player,kind,definition))continue;
-      if(medkit)pickup.remaining=definition.respawnMs/1000;
+      const respawnMs=pickup.respawnMs??definition.respawnMs;
+      if(respawnMs)pickup.remaining=respawnMs/1000;
       else retireMapBuff(world,buff);
       const audio=audioEvent(world,'pickup',{id:player.id,x:pickup.x,y:pickup.y});
       audio.item=kind;
@@ -828,9 +857,10 @@ export function step(world,dt) {
     advanceBuffs(p,dt);
     beginMedkit(world,p,medkitRequest);
     const treating=!!p.medkit;
+    if(p.portalCooldown>0)p.portalCooldown=Math.max(0,p.portalCooldown-dt);
     if(activated&&interactionPressed(p,i.interact)){
       const mechanism=nearbyMechanism(layout,mechanisms,p);
-      if(mechanism&&!activated.has(mechanism.state.id)&&triggerMechanism(mechanism,p,world.players,playerHalfWidth))activated.add(mechanism.state.id);
+      if(mechanism&&!activated.has(mechanism.state.id)&&interact(world,map,mechanisms,mechanism,p,world.time+dt))activated.add(mechanism.state.id);
     }
     p.shield=Math.max(0,p.shield-dt);p.cool-=dt;p.grenadeCool-=dt;
     const allowedWeapons=world.match?.weapons;
