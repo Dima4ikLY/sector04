@@ -108,7 +108,7 @@ export const startup=armory.startup;
 const wardrobe=createWardrobe({armory,isPlaying:()=>!!session,onNotice:toast,use3D,effects:()=>preferences.effects,skinEffects:showSkinEffects,fpsLimit:()=>preferences.fpsLimit});
 const roomCode=$('roomCode');
 function enterByCode(code){roomCode.value=code;return join('join');}
-const roomBrowser=createRoomBrowser({mount:$('roomBrowser'),onJoin:enterByCode,onCreate:()=>join('create'),onNotice:toast});
+const roomBrowser=createRoomBrowser({mount:$('roomBrowser'),onJoin:enterByCode,onCreate:createOpts=>join('create',createOpts?.mode,createOpts?.mapId,createOpts?.options),onNotice:toast});
 const invited=new URLSearchParams(location.search).get('room')?.trim();
 let incomingCode=/^[0-9a-f]{6}$/i.test(invited??'')?invited.toUpperCase():'';
 if(incomingCode){
@@ -1356,5 +1356,6 @@ async function initVK(){
   }
 }
 initVK();
+
 
 
