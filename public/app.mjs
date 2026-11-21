@@ -54,7 +54,7 @@ let resultFinishCuePending=false,resultRewardCount=null;
 const matchCapacities={ffa:6,'1v1':2,'2v2':4,'3v3':6};
 const teamNames=['Синие','Оранжевые'];
 let world=createWorld(),session=null,stream=null,joining=false,mouse={x:W*.7,y:H*.5},last=performance.now(),lastState=0,touch=matchMedia('(pointer:coarse), (max-width:650px)').matches;
-let inputPending=false,toastTimer,progressWarning=false,selectedMatchMode='ffa',selectedMap=getMapsForMode()[0].id,bg=null,grenadePending=false,bg3D=false,stalled=false,fpsTime=null,fpsFrames=0,leaving=null;
+let inputPending=false,toastTimer,progressWarning=false,selectedMatchMode='ffa',selectedMap=getMapsForMode()[0].id,bg=null,grenadePending=false,bg3D=false,stalled=false,fpsTime=null,fpsFrames=0,leaving=null,touchJoystick;
 let preferences=readSettings();
 const shouldDrawArena=createFrameLimiter();
 const motion=new SnapshotBuffer();
@@ -92,6 +92,7 @@ function applySettings(value){
   if(value.renderer==='3d'&&!actors3D)actors3D=createCharacterScene($('actors3d'),{report:true});
   $('actors3d').style.visibility=use3D()?'visible':'hidden';
   document.documentElement.dataset.characterRenderer=document.documentElement.dataset.worldRenderer=use3D()?'3d':'2d';
+  document.documentElement.dataset.touchLayout=value.touchLayout;
   $('fpsCounter').hidden=!value.showFps;
   document.querySelectorAll('[data-keybind]').forEach(label=>{
     label.textContent=keyLabel(value.bindings[label.dataset.keybind]);
@@ -109,7 +110,7 @@ export const startup=armory.startup;
 const wardrobe=createWardrobe({armory,isPlaying:()=>!!session,onNotice:toast,use3D,effects:()=>preferences.effects,skinEffects:showSkinEffects,fpsLimit:()=>preferences.fpsLimit});
 const roomCode=$('roomCode');
 function enterByCode(code){roomCode.value=code;return join('join');}
-const roomBrowser=createRoomBrowser({mount:$('roomBrowser'),onJoin:enterByCode,onNotice:toast});
+const roomBrowser=createRoomBrowser({mount:$('roomBrowser'),panel:$('roomsMenu'),onJoin:enterByCode,onNotice:toast});
 function syncRoomCreateMaps(){
   const modeSelect=document.getElementById('roomCreateMode'),mapSelect=document.getElementById('roomCreateMap');
   if(!modeSelect||!mapSelect)return;
@@ -338,7 +339,7 @@ $('rangeWeapon').addEventListener('change',event=>{
   selectWeapon(Number(event.target.value));
   canvas.focus({preventScroll:true});
 });
-function clearControls(){keys.clear();touchKeys.clear();slideGesture.reset();grenadePending=false;medkitPending=null;proneRequested=false;requestedInteraction=0;}
+function clearControls(){keys.clear();touchKeys.clear();slideGesture.reset();grenadePending=false;medkitPending=null;proneRequested=false;requestedInteraction=0;if(touchJoystick)resetJoystick();}
 const waitingForMatch=()=>world.match?.phase==='waiting';
 const battleLocked=()=>waitingForMatch()||!!world.countdown;
 function prepareBattleIntro(mapId,mode){
@@ -740,6 +741,34 @@ $('viewport').addEventListener('wheel',event=>{
   if(cycleWeapon(Math.sign(event.deltaY)))event.preventDefault();
 },{passive:false});
 $('weaponNext').onclick=()=>cycleWeapon(1);
+touchJoystick=$('touchJoystick');
+let joystickPointerId=null,joystickState={left:false,right:false,jump:false,crouch:false};
+function resetJoystick(){
+  joystickPointerId=null;
+  joystickState={left:false,right:false,jump:false,crouch:false};
+  touchKeys.delete('left');touchKeys.delete('right');touchKeys.delete('jump');touchKeys.delete('crouch');
+  touchJoystick?.style.setProperty('--stick-x','0px');touchJoystick?.style.setProperty('--stick-y','0px');
+}
+function updateJoystick(event){
+  const box=touchJoystick.getBoundingClientRect(),radius=box.width*.34;
+  const dx=event.clientX-(box.left+box.width/2),dy=event.clientY-(box.top+box.height/2);
+  const distance=Math.hypot(dx,dy),scale=distance>radius?radius/distance:1;
+  const x=dx*scale,y=dy*scale,threshold=radius*.3;
+  const next={left:x<-threshold,right:x>threshold,jump:y<-threshold,crouch:y>threshold};
+  if((next.left&&!joystickState.left)||(next.right&&!joystickState.right))tapTouchMovement(next.left?'left':'right');
+  joystickState=next;
+  for(const action of ['left','right','jump','crouch']){
+    if(next[action])touchKeys.add(action);
+    else touchKeys.delete(action);
+  }
+  touchJoystick.style.setProperty('--stick-x',`${x}px`);touchJoystick.style.setProperty('--stick-y',`${y}px`);
+}
+touchJoystick.addEventListener('pointerdown',event=>{
+  event.preventDefault();if(!canControl())return;
+  proneRequested=false;joystickPointerId=event.pointerId;touchJoystick.setPointerCapture(event.pointerId);updateJoystick(event);
+});
+touchJoystick.addEventListener('pointermove',event=>{if(event.pointerId===joystickPointerId)updateJoystick(event);});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])touchJoystick.addEventListener(type,event=>{if(event.pointerId===joystickPointerId)resetJoystick();});
 document.querySelectorAll('[data-control]:not([data-control="weapon"])').forEach(button=>{
   const control=button.dataset.control;
   button.addEventListener('pointerdown',event=>{

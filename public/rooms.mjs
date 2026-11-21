@@ -26,9 +26,10 @@ export function visibleRooms(data){
   return rooms.sort((a,b)=>(a.players===a.capacity)-(b.players===b.capacity)||b.players/b.capacity-a.players/a.capacity||a.code.localeCompare(b.code));
 }
 
-export function createRoomBrowser({mount,onJoin,onNotice=()=>{}}){
+export function createRoomBrowser({mount,panel,onJoin,onNotice=()=>{}}){
   const node=(tag,className,text)=>{const el=document.createElement(tag);if(className)el.className=className;if(text!==undefined)el.textContent=text;return el;};
-  const details=node('details','room-browser'),summary=node('summary','','Открытые комнаты'),body=node('div','room-browser-body');
+  const details=panel||node('details','room-browser'),body=node('div','room-browser-body');
+  details.classList.add('room-browser');
   const tools=node('div','room-browser-tools'),caption=node('span','','Онлайн на этом сервере'),refreshButton=node('button','room-refresh','Обновить');refreshButton.type='button';refreshButton.setAttribute('aria-label','Обновить список комнат');
   const status=node('p','room-browser-status'),list=node('div','room-browser-list'),empty=node('div','room-browser-empty'),emptyText=node('p','','Сейчас нет открытых комнат. Начни поиск матча или пригласи друзей в свою комнату.');
 
@@ -36,8 +37,12 @@ export function createRoomBrowser({mount,onJoin,onNotice=()=>{}}){
   empty.append(emptyText);
   empty.hidden=true;
   body.append(tools,status,list,empty);
-  details.append(summary,body);
-  mount.replaceChildren(details);
+  if(panel)mount.replaceChildren(body);
+  else{
+    const summary=node('summary','','Открытые комнаты');
+    details.append(summary,body);
+    mount.replaceChildren(details);
+  }
   let controller=null,revision=0,destroyed=false,playing=false,loading=false,joining=false;
   function buttons(){
     refreshButton.disabled=loading||playing||joining;

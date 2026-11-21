@@ -1,6 +1,6 @@
 import {assignBinding,defaultBindings,keyActions,keyLabel,normalizeBindings} from './keybinds.mjs';
 
-export const defaultSettings=Object.freeze({volume:65,renderer:'3d',fpsLimit:'auto',effects:true,showFps:false,bindings:defaultBindings});
+export const defaultSettings=Object.freeze({volume:65,renderer:'3d',fpsLimit:'auto',effects:true,showFps:false,touchLayout:'left',bindings:defaultBindings});
 const storageKey='sector-settings';
 let panelNumber=0;
 
@@ -12,6 +12,7 @@ function validate(value){
     fpsLimit:v.fpsLimit===60||v.fpsLimit===90?v.fpsLimit:defaultSettings.fpsLimit,
     effects:typeof v.effects==='boolean'?v.effects:defaultSettings.effects,
     showFps:typeof v.showFps==='boolean'?v.showFps:defaultSettings.showFps,
+    touchLayout:v.touchLayout==='right'?'right':defaultSettings.touchLayout,
     bindings:normalizeBindings(v.bindings)
   };
 }
@@ -36,6 +37,7 @@ export function createSettings({mount,onChange=()=>{}}){
       <div class="settings-field"><label for="${id}-volume">Громкость <output id="${id}-volume-value" for="${id}-volume"></output></label><input id="${id}-volume" type="range" min="0" max="100" step="1" aria-describedby="${id}-volume-note"><small id="${id}-volume-note">0% — без звука. Кнопка звука в шапке позволяет быстро выключить и включить его.</small></div>
       <div class="settings-field"><label for="${id}-renderer">Графика</label><select id="${id}-renderer"><option value="3d">Объёмная графика</option><option value="2d">Упрощённая графика</option></select><small>Если игра замедляется, выбери упрощённую графику. Управление и правила боя сохранятся.</small></div>
       <div class="settings-field"><label for="${id}-fps-limit">Лимит FPS</label><select id="${id}-fps-limit" aria-describedby="${id}-fps-note"><option value="auto">Авто (по частоте экрана)</option><option value="60">До 60 FPS</option><option value="90">До 90 FPS</option></select><small id="${id}-fps-note">Фактическая частота кадров зависит от частоты экрана и производительности устройства.</small></div>
+      <div class="settings-field"><label for="${id}-touch-layout">Управление на телефоне</label><select id="${id}-touch-layout"><option value="left">Джойстик слева</option><option value="right">Джойстик справа</option></select><small>Ходьба, прыжок и присед управляются круглым джойстиком. Боевые кнопки автоматически переедут на другую сторону.</small></div>
       <label class="settings-toggle" for="${id}-effects"><span><strong>Эффекты боя</strong><small>Вспышки, искры, частицы и эффекты обликов.</small></span><input id="${id}-effects" type="checkbox"></label>
       <label class="settings-toggle" for="${id}-fps"><span><strong>Показывать FPS</strong><small>Частота кадров рядом с ареной.</small></span><input id="${id}-fps" type="checkbox"></label>
       <details class="settings-bindings">
@@ -49,7 +51,7 @@ export function createSettings({mount,onChange=()=>{}}){
     </div>`;
   mount.append(button);document.body.append(dialog);
   const find=s=>dialog.querySelector(s),volume=find(`#${id}-volume`),volumeValue=find(`#${id}-volume-value`),renderer=find(`#${id}-renderer`),effects=find(`#${id}-effects`),fps=find(`#${id}-fps`);
-  const fpsLimit=find(`#${id}-fps-limit`);
+  const fpsLimit=find(`#${id}-fps-limit`),touchLayout=find(`#${id}-touch-layout`);
   const bindingsPanel=find('.settings-bindings'),keyStatus=find('.settings-key-status');
   const keyButtons=[...dialog.querySelectorAll('[data-key-action]')];
   function copyValue(){return {...value,bindings:{...value.bindings}};}
@@ -63,7 +65,7 @@ export function createSettings({mount,onChange=()=>{}}){
   }
   function sync(){
     volume.value=value.volume;volumeValue.textContent=`${value.volume}%`;renderer.value=value.renderer;fpsLimit.value=String(value.fpsLimit);
-    effects.checked=value.effects;fps.checked=value.showFps;syncKeys();
+    effects.checked=value.effects;fps.checked=value.showFps;touchLayout.value=value.touchLayout;syncKeys();
   }
   function apply(next){value=saveSettings(next);sync();onChange(copyValue());}
   function cancelCapture(message=''){
@@ -109,6 +111,7 @@ export function createSettings({mount,onChange=()=>{}}){
   volume.addEventListener('input',()=>apply({...value,volume:Number(volume.value)}));
   renderer.addEventListener('change',()=>apply({...value,renderer:renderer.value}));
   fpsLimit.addEventListener('change',()=>apply({...value,fpsLimit:fpsLimit.value==='auto'?'auto':Number(fpsLimit.value)}));
+  touchLayout.addEventListener('change',()=>apply({...value,touchLayout:touchLayout.value}));
   effects.addEventListener('change',()=>apply({...value,effects:effects.checked}));
   fps.addEventListener('change',()=>apply({...value,showFps:fps.checked}));
   find('.settings-reset').addEventListener('click',()=>{
