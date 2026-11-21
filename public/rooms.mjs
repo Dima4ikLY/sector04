@@ -46,6 +46,12 @@ export function createRoomBrowser({mount,onJoin,onCreate,onNotice=()=>{}}){
   const timeSelect=node('select','room-create-input');
   for(const value of [1,2,3,5,7,10,15])timeSelect.append(new Option(value+' мин',String(value)));
   timeSelect.value='3';
+  const diffSelect=node('select','room-create-input');
+  diffSelect.append(new Option('Боты: лёгкие','easy'));
+  diffSelect.append(new Option('Боты: средние','normal'));
+  diffSelect.append(new Option('Боты: сложные','hard'));
+  diffSelect.value='normal';
+
   const weaponsBox=node('div','room-create-weapons');
   const weaponLabels=['AR-04','SG-12','RX-9','P-9','AK-47','MG-60','TITAN-100','EAGLE .50','BR-8','VX-9','SM-11'];
   weaponLabels.forEach((label,index)=>{
@@ -58,7 +64,7 @@ export function createRoomBrowser({mount,onJoin,onCreate,onNotice=()=>{}}){
   });
   const createSubmit=node('button','secondary','Создать');createSubmit.type='submit';
   const cancelCreate=node('button','room-cancel','Отмена');cancelCreate.type='button';
-  optionsRow.append(modeSelect,mapSelect,fragsSelect,timeSelect,weaponsBox,createSubmit,cancelCreate);
+  optionsRow.append(modeSelect,mapSelect,fragsSelect,timeSelect,diffSelect,weaponsBox,createSubmit,cancelCreate);
   createForm.append(optionsRow);
   createForm.hidden=true;
 
@@ -69,7 +75,7 @@ export function createRoomBrowser({mount,onJoin,onCreate,onNotice=()=>{}}){
   createForm.addEventListener('submit',event=>{
     event.preventDefault();
     const selected=[...weaponsBox.querySelectorAll('input:checked')].map(input=>Number(input.value));
-    const options={frags:Number(fragsSelect.value),timeMinutes:Number(timeSelect.value),weapons:selected.length?selected:[...weapons.keys()]};
+    const options={frags:Number(fragsSelect.value),timeMinutes:Number(timeSelect.value),weapons:selected.length?selected:[...weapons.keys()],botDifficulty:diffSelect.value};
     act(()=>onCreate({mode:modeSelect.value,mapId:mapSelect.value,options}));
   });
   cancelCreate.addEventListener('click',()=>{createForm.hidden=true;createButton.hidden=false;});

@@ -470,7 +470,7 @@ function fireWeapon(world,map,obstacles,player,gun,firedAt){
     const contact=bulletSurfaceContact(surface,from.x,from.y,dx,dy);
     if(!obstruction||contact.fraction<obstruction.contact.fraction)obstruction={surface,contact};
   }
-  const damage=player.coopEnemy?Math.round(gun.damage*(.1+world.coop.wave*.1)):gun.damage*(player.bot?.4:1);
+  const damage=player.coopEnemy?Math.round(gun.damage*(.1+world.coop.wave*.1)):gun.damage*(player.bot?(world.match?.botDamage??0.4):1);
   const critical=gun.projectile!=='rocket'&&player.buffs.critical>0;
   if(critical)player.buffs.critical=0;
   if(obstruction){
@@ -711,11 +711,12 @@ export function botInput(p,world,dt=1/60,map=mapWithMechanisms(getMap(world.mapI
   const hop=!!obstacle&&obstacle.kind!=='door'&&canHop&&!crouch&&!prone&&!underpass;
   const gate=blocked?nearbyMechanism(map,world.mechanisms,p):null;
   const interact=gate?.definition.type==='door'&&gate.state.target===0&&!hasLineOfSight(origin,target,[gate.definition]);
-  if(p.botTarget!==t.id){p.botTarget=t.id;p.botReaction=.8;}
-  p.botReaction=Math.max(0,(p.botReaction??.8)-dt);
-  const aim=Math.atan2(aimY,dx)+Math.sin(world.time*2.1+world.players.indexOf(p)*3)*.25;
+  const botSkill=world.match?.botSkill??{};
+  if(p.botTarget!==t.id){p.botTarget=t.id;p.botReaction=botSkill.reaction??.8;}
+  p.botReaction=Math.max(0,(p.botReaction??(botSkill.reaction??.8))-dt);
+  const aim=Math.atan2(aimY,dx)+Math.sin(world.time*2.1+world.players.indexOf(p)*3)*(botSkill.aimWobble??.25);
   const burst=Math.sin(world.time*3+world.players.indexOf(p)*2)>.55;
-  return {left:moving&&dx<0,right:moving&&dx>0,crouch,prone,interact,jump:hop||(!crouch&&!prone&&dy<-60&&Math.sin(world.time*2+p.x)>.9),fire:p.botReaction<=0&&Math.hypot(dx,dy)<620&&clear&&!blocked&&burst&&t.shield<=0,angle:aim,reload:p.ammo===0};
+  return {left:moving&&dx<0,right:moving&&dx>0,crouch,prone,interact,jump:hop||(!crouch&&!prone&&dy<-60&&Math.sin(world.time*2+p.x)>.9),fire:p.botReaction<=0&&Math.hypot(dx,dy)<(botSkill.range??620)&&clear&&!blocked&&burst&&t.shield<=0,angle:aim,reload:p.ammo===0};
 }
 export function step(world,dt) {
   if(world.ended||world.countdown||world.coop?.phase==='waiting'||world.match?.phase==='waiting')return;
@@ -794,7 +795,7 @@ export function step(world,dt) {
     const sliding=p.stance==='slide';
     p.vx=sliding
       ? p.slideDirection*(slideEndSpeed+(slideStartSpeed-slideEndSpeed)*(p.slide/SLIDE_DURATION))
-      : ((i.right?1:0)-(i.left?1:0))*(p.bot?155:285)*speed*(treating?medkitSpeed:1)*
+      : ((i.right?1:0)-(i.left?1:0))*(p.bot?(world.match?.botSpeed??155):285)*speed*(treating?medkitSpeed:1)*
         (p.buffs.speed>0?PICKUP_TYPES.speed.multiplier:1);
     const jumping=!treating&&standing&&i.jump&&!p.previous.jump&&p.jumps<(map.maxJumps||2);
     if(jumping){p.vy=-(map.jumpSpeed||590);p.jumps++;}

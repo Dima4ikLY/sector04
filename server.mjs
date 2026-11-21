@@ -16,12 +16,19 @@ const sharePreview='/art/brand/vk-link-preview-1200x630.jpg';
 const gameBanner='/art/brand/sector04-game-1920x1080.jpg';
 const hostAuthority=/^(?:\[[a-f\d:.]+\]|[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?(?:\.[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?)*\.?)(?::\d{1,5})?$/i;
 
+const botPresets={
+  easy:{botSpeed:155,botDamage:0.4,botSkill:{reaction:0.8,aimWobble:0.25,range:620}},
+  normal:{botSpeed:200,botDamage:0.65,botSkill:{reaction:0.45,aimWobble:0.12,range:820}},
+  hard:{botSpeed:255,botDamage:0.9,botSkill:{reaction:0.22,aimWobble:0.05,range:1050}}
+};
+
 const roomOptionLimits={frags:[5,10,15,20,25,30,50],timeMinutes:[1,2,3,5,7,10,15],maxWeapons:11};
 function sanitizeRoomOptions(options){
   if(typeof options!=='object'||options===null)return {};
   const out={};
   if(roomOptionLimits.frags.includes(options.frags))out.frags=options.frags;
   if(roomOptionLimits.timeMinutes.includes(options.timeMinutes))out.timeMinutes=options.timeMinutes;
+if(['easy','normal','hard'].includes(options.botDifficulty))out.botDifficulty=options.botDifficulty;
   if(Array.isArray(options.weapons)){
     const allowed=[...new Set(options.weapons.filter(index=>Number.isInteger(index)&&index>=0&&index<roomOptionLimits.maxWeapons))].sort((a,b)=>a-b);
     if(allowed.length)out.weapons=allowed;
@@ -353,7 +360,7 @@ export function createArenaServer({
               if(waitMs!==null)room.searchEndsAt=now+waitMs;
               world.match={mode:matchMode,phase:'waiting',capacity:matchConfig.capacity,
                 remaining:waitMs===null?null:Math.ceil(waitMs/1000),...(privateMatch?{private:true}:{}),
-                ...(roomOptions.frags?{frags:roomOptions.frags}:{}),...(roomOptions.weapons?{weapons:roomOptions.weapons}:{})};
+                ...(roomOptions.frags?{frags:roomOptions.frags}:{}),...(roomOptions.weapons?{weapons:roomOptions.weapons}:{}),...(botPresets[roomOptions.botDifficulty]??botPresets.easy)};
             }
             rooms.set(code,room);
           }
