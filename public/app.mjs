@@ -35,7 +35,8 @@ import {createTouchPresses,nearestVisibleAimPoint,sampleJoystick} from './touch-
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');
 const hudCanvas=$('hudCanvas'),hud=hudCanvas.getContext('2d');
 const battleSurface=$('battleSurface');
-const arenaExpanded=()=>!!document.fullscreenElement||battleSurface.hasAttribute('data-expanded');
+const arenaExpanded=()=>document.fullscreenElement===battleSurface||battleSurface.hasAttribute('data-expanded');
+let wantsBattleFullscreen=false,fullscreenRequestPending=false;
 let arenaBounds=null,displaySize=null,displayDensity=0;
 new ResizeObserver(([entry])=>{arenaBounds=entry.contentRect;displaySize=null;}).observe(hudCanvas);
 const matchNames={ffa:'Онлайн-матч','1v1':'Дуэль 1×1','2v2':'Командный 2×2','3v3':'Командный 3×3'};
@@ -483,6 +484,7 @@ function clearBattleIntro(){
 }
 const landscapeView=matchMedia('(orientation: landscape)');
 function scrollToBattle(behavior='instant'){
+  if(arenaExpanded())return;
   const viewport=$('viewport');
   if(touch)viewport.closest('.arena-panel').scrollIntoView({behavior:'instant',block:'start'});
   else viewport.scrollIntoView({behavior,block:'center'});
@@ -503,6 +505,31 @@ function expandBattleSurface(expanded){
   battleSurface.toggleAttribute('data-expanded',expanded);
   syncArenaFrame();
   (expanded?$('exitFullscreen'):$('fullscreen')).focus({preventScroll:true});
+}
+async function enterBattleFullscreen(){
+  wantsBattleFullscreen=true;
+  if(arenaExpanded()||fullscreenRequestPending)return;
+  if(!battleSurface.requestFullscreen||navigator.userActivation?.isActive===false){
+    expandBattleSurface(true);
+    return;
+  }
+  fullscreenRequestPending=true;
+  try{
+    await battleSurface.requestFullscreen();
+    if(!wantsBattleFullscreen&&document.fullscreenElement===battleSurface)await document.exitFullscreen();
+  }catch{
+    if(wantsBattleFullscreen&&!arenaExpanded())expandBattleSurface(true);
+  }finally{fullscreenRequestPending=false;}
+}
+function exitBattleFullscreen(){
+  wantsBattleFullscreen=false;
+  if(battleSurface.hasAttribute('data-expanded'))expandBattleSurface(false);
+  if(document.fullscreenElement===battleSurface)return document.exitFullscreen().catch(()=>{});
+}
+function enterExpeditionFullscreen(current){
+  if(current.expeditionFullscreenStarted)return;
+  current.expeditionFullscreenStarted=true;
+  void enterBattleFullscreen();
 }
 function setQueueHeading(mode,mapId){
   $('queueTitle').textContent=mode==='1v1'?'Ожидаем соперника':'Поиск матча';
@@ -569,6 +596,7 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
   document.documentElement.classList.add('arena-visible');
   syncMapChoices(selectedMap);
   battleAudioReady=audio.unlock().catch(()=>{});
+  if(mode!=='coop'&&mode!=='join')void enterBattleFullscreen();
   void battleAudioReady.then(()=>{
     if(mode!=='range'&&audio.enabled&&preferences.musicVolume>0&&preferences.volume>0&&audio.context){
       return battleScore.preload(audio.context);
@@ -587,6 +615,7 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
     await armory.ready;
     const name=$('nickname').value.trim()||'Боец_04';
     const next=await api('join',{mode,matchMode,name,mapId,room:roomCode.value.trim().toUpperCase(),accountToken:armory.token,...(roomOptions&&mode==='create'?{options:roomOptions}:{})});
+    if(mode==='join'&&!next.coop)void enterBattleFullscreen();
     if(next.room===incomingCode)incomingCode='';
     next.weapon??=START_WEAPON;
     next.weaponSlots=next.range?[...weapons.keys()]:next.profile.owned;
@@ -639,6 +668,7 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
     stream.onmessage=e=>{
       if(session!==next)return;
       try{world=JSON.parse(e.data);}catch{return;}
+      if(next.coop&&(world.countdown||world.coop?.phase==='fight'))enterExpeditionFullscreen(next);
       lastState=performance.now();
       motion.push(world,lastState);
       feedback.consume(world.combatEvents,next.id,world.time,lastState);
@@ -663,15 +693,17 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
   }catch(error){clearBattleIntro();$('error').textContent=error.message;toast(error.message);}
   finally{
     if(showJoining&&!session)$('queueOverlay').hidden=true;
-    if(!session)document.documentElement.classList.remove('arena-visible');
+    if(!session){
+      void exitBattleFullscreen();
+      document.documentElement.classList.remove('arena-visible');
+    }
     joining=false;syncMapChoices(selectedMap);document.querySelectorAll('#lobby button').forEach(b=>b.disabled=false);roomBrowser.setPlaying(!!session);
   }
 }
-async function leave(){
+async function leave({keepArena=false}={}){
   if(!session)return;const old=session;session=null;stream?.close();stream=null;clearControls();motion.reset();canvas.style.cursor='default';
-  if(battleSurface.hasAttribute('data-expanded'))expandBattleSurface(false);
-  if(document.fullscreenElement?.closest('.arena-panel'))void document.exitFullscreen().catch(()=>{});
-  document.documentElement.classList.remove('arena-visible');
+  const fullscreenExit=keepArena?undefined:exitBattleFullscreen();
+  if(!keepArena)document.documentElement.classList.remove('arena-visible');
   audio.stopSlides();
   battleScore.stop();
   clearBattleIntro();
@@ -683,7 +715,10 @@ async function leave(){
   for(const id of ['session','matchHud','playerHud','touchControls','deathMessage','reloadIndicator','medkitIndicator','queueOverlay'])$(id).hidden=true;
   for(const id of ['lobby','mapTag','previewLabel'])$(id).hidden=false;
   $('killfeed').replaceChildren();$('scoreTitle').textContent='ПОСЛЕДНИЙ БОЙ';$('connection').textContent='ПРЕВЬЮ КАРТЫ';showMapPreview(lobbyMap(selectedMatchMode));
-  const pending=(async()=>{try{const result=await api('leave',{token:old.token});if(!session)armory.setProfile(result.profile);}catch{}})();leaving=pending;await pending;if(leaving===pending)leaving=null;
+  const pending=(async()=>{try{const result=await api('leave',{token:old.token});if(!session)armory.setProfile(result.profile);}catch{}})();
+  leaving=pending;
+  await Promise.all([pending,fullscreenExit]);
+  if(leaving===pending)leaving=null;
 }
 $('quick').onclick=()=>join('quick');$('train').onclick=()=>join('train');$('range').onclick=()=>join('range');$('create').onclick=()=>openFriendsCreate();$('leave').onclick=leave;
 $('duelPrivate').onclick=()=>join('create','1v1');
@@ -696,6 +731,7 @@ $('coopStart').onclick=async()=>{
   startingCoop=true;
   $('coopStart').disabled=true;
   battleAudioReady=audio.unlock().catch(()=>{});
+  enterExpeditionFullscreen(current);
   showBattleLoading();
   try{
     await api('start-coop',{token:current.token});
@@ -704,7 +740,11 @@ $('coopStart').onclick=async()=>{
     if(session===current){
       startingCoop=false;
       $('coopStart').disabled=false;
-      if(world.coop?.phase==='waiting'&&!world.countdown)battleIntro.hidden=true;
+      if(world.coop?.phase==='waiting'&&!world.countdown){
+        battleIntro.hidden=true;
+        delete current.expeditionFullscreenStarted;
+        void exitBattleFullscreen();
+      }
       toast(error.message);
     }
   }
@@ -713,11 +753,12 @@ $('joinToggle').onclick=()=>{$('joinForm').hidden=!$('joinForm').hidden;if(!$('j
 roomCode.addEventListener('input',()=>{roomCode.value=roomCode.value.trim().toUpperCase();});
 $('joinForm').onsubmit=e=>{e.preventDefault();join('join');};
 $('back').onclick=leave;
-$('again').onclick=async()=>{
+$('again').onclick=()=>{
+  if(!session||joining)return;
   const mode=session?.coop?'coop':session?.range?'range':session?.training?'train':session?.match?.private?'create':'quick';
   const matchMode=session?.match?.mode??(mode==='quick'?'ffa':undefined),mapId=session?.mapId;
-  await leave();
-  join(mode,matchMode,mapId);
+  void leave({keepArena:mode!=='coop'});
+  void join(mode,matchMode,mapId);
 };
 async function copyInvitation(manualLink){
   const current=session;
@@ -746,22 +787,16 @@ async function copyInvitation(manualLink){
 $('invite').onclick=()=>copyInvitation(waitingForMatch()&&session?.match?.mode==='1v1'?$('queueInviteUrl'):null);
 $('help').onclick=()=>{clearControls();$('helpDialog').showModal();};$('closeHelp').onclick=()=>$('helpDialog').close();
 $('helpDialog').addEventListener('click',e=>{if(e.target===$('helpDialog'))$('helpDialog').close();});
-async function toggleFullscreen(){
-  if(battleSurface.hasAttribute('data-expanded')){expandBattleSurface(false);return;}
-  try{
-    if(document.fullscreenElement)await document.exitFullscreen();
-    else await (touch?battleSurface:$('viewport')).requestFullscreen();
-  }catch{
-    if(touch&&!document.fullscreenElement)expandBattleSurface(true);
-    else toast('Полноэкранный режим недоступен в этом браузере');
-  }
+function toggleFullscreen(){
+  if(arenaExpanded()||fullscreenRequestPending&&wantsBattleFullscreen)void exitBattleFullscreen();
+  else void enterBattleFullscreen();
 }
 $('fullscreen').onclick=toggleFullscreen;
 $('exitFullscreen').onclick=toggleFullscreen;
 document.addEventListener('keydown',event=>{
   if(event.key!=='Escape'||!battleSurface.hasAttribute('data-expanded')||document.querySelector('dialog[open]'))return;
   event.preventDefault();
-  expandBattleSurface(false);
+  void exitBattleFullscreen();
 });
 $('sound').onclick=async()=>{
   try{
@@ -853,7 +888,6 @@ touchMedia.addEventListener('change',event=>{
   touch=event.matches;
   mouseAim=false;
   document.documentElement.toggleAttribute('data-touch-combat',touch);
-  if(!touch&&battleSurface.hasAttribute('data-expanded'))expandBattleSurface(false);
   syncTouchControls();
   if(touch&&session&&!arenaExpanded())scrollToBattle();
 });
