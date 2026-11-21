@@ -34,7 +34,8 @@ export const arenaLooks = {
 };
 
 export const mechanismLights={ready:'#89f3dc',moving:'#ffc478',closed:'#ed916b'};
-export const teamSpawnColors=['#8bceff','#ffbf7d'];
+export const teamSpawnColors=['#59b7ff','#ffa63d'];
+export const teamFightColors=['#3fd0ff','#ff7a2e'];
 export const teamSpawnBeacon={
   housing:[
     {x:-23,y:-32,w:46,h:22},
@@ -267,3 +268,4 @@ export function platformDetails(ctx, s, map, solid = false) {
   rect(ctx,s.x+s.w-1.4,s.y+5.5,1.4,s.h-5.5,look.outline);
   if (!floor) rect(ctx,s.x,beamBottom-1.4,s.w,1.4,look.outline);
 }
+

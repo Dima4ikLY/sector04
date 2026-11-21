@@ -5,7 +5,7 @@ import {START_WEAPON,armorForEquipment,helmetForEquipment,ranks,rankIndex,rankUn
 import {getMap,getMapsForMode} from './maps.mjs';
 import {AimCamera,sampleBlastShake} from './camera.mjs';
 import {buildScenery,drawMapMechanisms} from './scenery.mjs';
-import {teamSpawnColors as teamColors} from './map-detail.mjs';
+import {teamSpawnColors as teamColors,teamFightColors} from './map-detail.mjs';
 import {mapWithMechanisms,nearbyMechanism} from './map-interactives.mjs';
 import {WeaponAudio} from './audio.mjs';
 import {drawCharacter,drawCharacterLabel,characterStyles,characterPalettes} from './characters.mjs';
@@ -1191,7 +1191,7 @@ function drawScoreboard(){
   const groups=world.teams?teamNames.map((_,team)=>ranked.filter(player=>player.team===team)):[ranked];
   groups.forEach((players,team)=>{
     if(world.teams){
-      hud.fillStyle=teamColors[team];
+      hud.fillStyle=teamFightColors[team];
       hud.fillText(`${teamNames[team]} · ${world.teams.scores[team]}`,460,y);
       y+=35;
     }
@@ -1272,6 +1272,23 @@ function render(t){
     arenaSkinEffects.update(ambientPlayers,t);
     arenaSkinEffects.draw(ctx,view);
   }else arenaSkinEffects.reset();
+  if(world.teams){
+    for(const p of players){
+      if(p.dead>0)continue;
+      const ringColor=teamFightColors[p.team]??'#ffffff';
+      ctx.save();
+      ctx.globalAlpha=.85;
+      ctx.strokeStyle=ringColor;
+      ctx.lineWidth=2.2/zoom;
+      ctx.beginPath();
+      ctx.ellipse(p.x,p.y,17/1,4.6/1,0,0,Math.PI*2);
+      ctx.stroke();
+      ctx.globalAlpha=.35;
+      ctx.fillStyle=ringColor;
+      ctx.fill();
+      ctx.restore();
+    }
+  }
   const flatMuzzles=new Map();
   for(const p of players){
     const muzzle=drawCharacter(ctx,p,{time:t,me:p.id===session?.id,weapon:weapons[p.weapon],body:!draw3D,labels:false,effects:false,skinEffects,
@@ -1315,7 +1332,7 @@ function render(t){
     if(p.x<viewX||p.x>viewX+view.width||p.y<viewY||p.y>viewY+view.height)continue;
     hud.globalAlpha=spawnOpacity.get(p.id)??1;
     drawCharacterLabel(hud,p,{me:p.id===session?.id,ally:!!session?.coop&&!p.bot,
-      teamColor:teamColors[p.team],pickupNotices:pickupNotices.get(p.id),screen:labelScreen});
+      teamColor:world.teams?teamFightColors[p.team]:teamColors[p.team],pickupNotices:pickupNotices.get(p.id),screen:labelScreen});
   }
   hud.globalAlpha=1;
   if(session&&!world.ended)feedback.draw(hud,{now:t,x:viewX,y:viewY,zoom,width:W,height:H,aimX:touch&&focus?(focus.x-viewX)*zoom:mouse.x,aimY:touch&&focus?(focus.y-shotOriginHeight(focus.stance)-viewY)*zoom:mouse.y,numbers:preferences.effects});
@@ -1326,7 +1343,7 @@ function render(t){
     if($('grenadeAimHint').textContent!==hint)$('grenadeAimHint').textContent=hint;
     const points=grenadeTrajectory(focus,physicalMap,angle),end=points.at(-1);hud.save();hud.scale(zoom,zoom);hud.translate(-viewX,-viewY);hud.strokeStyle='#f2ffd2';hud.shadowColor='#162a20';hud.shadowBlur=4;hud.lineWidth=2/zoom;hud.setLineDash([5/zoom,7/zoom]);hud.beginPath();points.forEach((p,i)=>i?hud.lineTo(p.x,p.y):hud.moveTo(p.x,p.y));hud.stroke();hud.setLineDash([]);hud.beginPath();hud.arc(end.x,end.y,9/zoom,0,Math.PI*2);hud.stroke();hud.restore();
   }
-  drawMinimap(hud,{map,physicalMap,viewX:baseX,viewY:baseY,viewWidth:view.width,viewHeight:view.height,
+  drawMinimap(hud,{map,physicalMap,players:session?scene.players:[],viewX:baseX,viewY:baseY,viewWidth:view.width,viewHeight:view.height,
     focus,width:W,height:H,unit,pixel,touch:touch&&!!session});
   if(session&&!touch&&!world.ended&&!battleLocked()){const p=world.players.find(p=>p.id===session.id);if(p&&p.dead<=0){hud.save();hud.shadowColor='#132b1c';hud.shadowBlur=4;hud.strokeStyle='#e7fac0';hud.lineWidth=2;hud.beginPath();hud.arc(mouse.x,mouse.y,8,0,Math.PI*2);hud.stroke();line(hud,mouse.x-14,mouse.y,mouse.x-5,mouse.y,'#e7fac0',2);line(hud,mouse.x+5,mouse.y,mouse.x+14,mouse.y,'#e7fac0',2);line(hud,mouse.x,mouse.y-14,mouse.x,mouse.y-5,'#e7fac0',2);line(hud,mouse.x,mouse.y+5,mouse.x,mouse.y+14,'#e7fac0',2);hud.restore();}}
   if(holding('score')&&session&&!session.range&&!session.coop&&!battleLocked())drawScoreboard();
@@ -1356,6 +1373,9 @@ async function initVK(){
   }
 }
 initVK();
+
+
+
 
 
 

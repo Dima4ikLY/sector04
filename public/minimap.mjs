@@ -7,7 +7,7 @@ function fitName(ctx,name,width){
   return '';
 }
 
-export function drawMinimap(ctx,{map,physicalMap,viewX,viewY,viewWidth,viewHeight,focus,width,height,unit=1,pixel=unit,touch=false}){
+export function drawMinimap(ctx,{map,physicalMap,players=[],viewX,viewY,viewWidth,viewHeight,focus,width,height,unit=1,pixel=unit,touch=false}){
   if(map.width<=width)return;
   const devicePixel=pixel/unit;
   const snap=value=>Math.round(value/devicePixel)*devicePixel;
@@ -55,6 +55,14 @@ export function drawMinimap(ctx,{map,physicalMap,viewX,viewY,viewWidth,viewHeigh
   const cameraX=fieldX+viewX*scaleX,cameraY=fieldY+viewY*scaleY;
   ctx.fillStyle='#ffd39818';ctx.fillRect(cameraX,cameraY,viewWidth*scaleX,viewHeight*scaleY);
   ctx.strokeStyle='#ffd398';ctx.lineWidth=1.2;ctx.strokeRect(cameraX,cameraY,viewWidth*scaleX,viewHeight*scaleY);
+  for(const p of players){
+    if(!p||p.dead>0)continue;
+    const dotX=Math.max(fieldX+2,Math.min(fieldX+fieldWidth-2,fieldX+p.x*scaleX));
+    const dotY=Math.max(fieldY+2,Math.min(fieldY+fieldHeight-2,fieldY+p.y*scaleY));
+    ctx.beginPath();ctx.arc(dotX,dotY,2.4,0,Math.PI*2);
+    ctx.fillStyle=p.id===(focus&&focus.id)?'#ffd76b':(focus&&p.team===focus.team?'#ffe9a8':(p.team===0?'#3fd0ff':'#ff7a2e'));
+    ctx.fill();
+  }
   if(focus){
     const x=Math.max(fieldX+3,Math.min(fieldX+fieldWidth-3,fieldX+focus.x*scaleX));
     const y=Math.max(fieldY+3,Math.min(fieldY+fieldHeight-3,fieldY+focus.y*scaleY));
@@ -63,3 +71,4 @@ export function drawMinimap(ctx,{map,physicalMap,viewX,viewY,viewWidth,viewHeigh
   }
   ctx.restore();
 }
+
