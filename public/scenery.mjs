@@ -426,6 +426,10 @@ export function buildScenery(map, {includePlatforms = true, atlas = null, backdr
   const ctx = canvas.getContext('2d');
   const look = arenaLooks[map.theme] || arenaLooks.foundry;
   ctx.scale(scale,scale);
+  if(map.backdrop?.aligned&&backdrop){
+    ctx.drawImage(backdrop,0,0,map.width,map.height);
+    return canvas;
+  }
   gradient(ctx,0,0,map.width,map.height,look.sky.map((color,i) => [i/2,color]));
   const photo = photographicBackdrop(ctx,backdrop,map,look) || atlasBackdrop(ctx,atlas,map);
   if (!photo) {

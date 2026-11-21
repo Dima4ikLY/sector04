@@ -400,9 +400,40 @@ const teamMaps=[
   })
 ];
 
-export const maps=[...freeForAllMaps,...teamMaps];
+const nightFoundry={
+  id:'night-foundry',name:'Ночная литейная',number:'19',zone:'ABANDONED FOUNDRY',
+  width:1774,height:887,theme:'foundry',jumpSpeed:680,
+  terrain:'Цех, мостки и верхний переход',
+  description:'Пробегите по нижнему цеху или займите верхний переход через боковые настилы.',
+  backdrop:{file:'night-foundry.png',aligned:true},
+  modes:['ffa','1v1','2v2','3v3'],
+  // Surface edges are measured in pixels from the supplied arena artwork.
+  platforms:[
+    {x:0,y:714,w:1774,h:34,kind:'floor'},
+    {x:0,y:524,w:162,h:22},{x:1612,y:524,w:162,h:22},
+    {x:668,y:546,w:87,h:16},{x:1022,y:546,w:86,h:16},
+    {x:128,y:458,w:578,h:22},{x:1071,y:458,w:579,h:22},
+    {x:0,y:319,w:164,h:22},{x:1610,y:319,w:164,h:22},
+    {x:661,y:355,w:84,h:16},{x:1031,y:355,w:84,h:16},
+    {x:513,y:246,w:159,h:19},{x:1102,y:246,w:161,h:19},
+    {x:670,y:201,w:435,h:20}
+  ],
+  solids:[
+    {x:465,y:660,w:87,h:54},{x:553,y:681,w:66,h:33},
+    {x:1164,y:670,w:68,h:44},{x:1232,y:653,w:89,h:61},{x:1321,y:684,w:39,h:30}
+  ],
+  spawns:[
+    {x:650,y:714},{x:1124,y:714},{x:265,y:458},
+    {x:1509,y:458},{x:575,y:246},{x:1199,y:246}
+  ],
+  teamSpawns:[
+    [{x:95,y:714},{x:295,y:458},{x:582,y:246}],
+    [{x:1679,y:714},{x:1479,y:458},{x:1192,y:246}]
+  ]
+};
+
+export const maps=[...freeForAllMaps,...teamMaps,nightFoundry];
 export const getMap=id=>maps.find(map=>map.id===id)||maps[0];
 export function getMapsForMode(mode='ffa'){
-  const pool=mode;
-  return maps.filter(map=>(map.mode??'ffa')===pool);
+  return maps.filter(map=>map.modes?map.modes.includes(mode):(map.mode??'ffa')===mode);
 }

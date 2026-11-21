@@ -39,6 +39,10 @@ function slabGeometry(width,height,depth,worldX,worldY) {
 
 export function buildWorldModel(map) {
   const root = new THREE.Group();
+  if(map.backdrop?.aligned){
+    root.userData.mapId=map.id;
+    return {root,updateMechanisms(){},dispose(){}};
+  }
   const look = arenaLooks[map.theme] || arenaLooks.foundry;
   const random = rng(map.width * 61);
   const textures = [newTexture(map.theme === 'canyon' ? 'rust' : 'steel'),newTexture('concrete')];

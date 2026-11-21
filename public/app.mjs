@@ -156,7 +156,7 @@ if(incomingCode){
   document.querySelector('.friends-menu').open=true;
 }
 function demo(){
-  const teamSize=getMap(selectedMap).teamSpawns?.[0]?.length??0;
+  const teamSize=selectedMatchMode==='ffa'?0:matchCapacities[selectedMatchMode]/2;
   const demoNames=['VECTOR','KIRA','GHOST','AXEL','PULSE','ECHO'];
   world=createWorld(selectedMap,{teamSize});camera.reset();shotMuzzles.clear();arenaSkinEffects.reset();
   const previewPlayers=selectedMatchMode==='1v1'?0:teamSize?teamSize*2:4;
@@ -168,6 +168,7 @@ function demo(){
   audio.reset();
 }
 function lobbyMap(mode){return mapSelections.get(mode)??getMapsForMode(mode)[0].id;}
+function practiceMap(){return getMapsForMode().includes(getMap(selectedMap))?selectedMap:lobbyMap('ffa');}
 const currentMatchMode=()=>session?.match?.mode??(session?'ffa':selectedMatchMode);
 function syncMapChoices(mapId){
   const mode=currentMatchMode();
@@ -199,7 +200,7 @@ function syncMapChoices(mapId){
   $('queueHint').textContent=selectedMatchMode==='1v1'?'Матч начнётся, когда подключится соперник. Ботов нет.':
     'До 10 секунд на подбор. Свободные места займут боты.';
   $('mapPracticeHint').hidden=selectedMatchMode==='ffa';
-  $('mapPracticeHint').textContent=`Тренировка, экспедиция, стрельбище и новая комната используют карту «${getMap(lobbyMap('ffa')).name}».`;
+  $('mapPracticeHint').textContent=`Тренировка, экспедиция и стрельбище используют карту «${getMap(practiceMap()).name}».`;
 }
 function syncMapLabels(mapId){
   const map=getMap(mapId);$('mapZone').textContent=`${map.number} / ${map.zone}`;$('mapTitle').textContent=map.name.toUpperCase();$('mapDescription').textContent=map.description;
@@ -227,9 +228,9 @@ function scenery(map){
     photo.addEventListener('load',()=>{
       if(world.mapId===map.id){bg=scenery(map);document.documentElement.dataset.arenaArt='ready';}
     },{once:true});
-    photo.src=`/art/backgrounds/${map.id}.jpg`;
+    photo.src=`/art/backgrounds/${map.backdrop.file??`${map.id}.jpg`}`;
   }
-  return buildScenery(map,{includePlatforms:!bg3D,backdrop:photo?.complete&&photo.naturalWidth?photo:null});
+  return buildScenery(map,{includePlatforms:!bg3D||map.backdrop?.aligned,backdrop:photo?.complete&&photo.naturalWidth?photo:null});
 }
 function showMapPreview(id){selectedMap=id;demo();bg=scenery(getMap(id));syncMapLabels(id);}
 function selectMap(id){
@@ -246,6 +247,13 @@ function createTeamThumbnail(map){
   return preview;
 }
 function createMapPreview(map){
+  if(map.backdrop?.aligned){
+    const image=new Image(480,240);
+    image.src=`/art/backgrounds/${map.backdrop.file}`;
+    image.alt='';
+    image.decoding='async';
+    return image;
+  }
   if(!map.teamSpawns){
     const image=new Image(480,200);
     image.src=`/art/maps/${map.id}.webp`;image.alt='';image.decoding='async';image.onerror=()=>{image.replaceWith(createTeamThumbnail(map));};
@@ -495,7 +503,7 @@ function syncMatchQueue(initial=false){
   }
   return waiting;
 }
-async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,mapId=lobbyMap(matchMode??'ffa'),roomOptions=undefined){
+async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,mapId=matchMode?lobbyMap(matchMode):practiceMap(),roomOptions=undefined){
   if(joining||session)return;joining=true;clearControls();$('error').textContent='';document.querySelectorAll('#lobby button').forEach(b=>b.disabled=true);
   document.documentElement.classList.add('arena-visible');
   syncMapChoices(selectedMap);

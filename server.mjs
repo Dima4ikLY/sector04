@@ -11,7 +11,10 @@ import {ProfileStore,EconomyError} from './profiles.mjs';
 
 const root=fileURLToPath(new URL('./public/',import.meta.url));
 const mapPreviews=new Map(getMapsForMode().map(({id})=>[`/art/maps/${id}.webp`,`art/maps/${id}.webp`]));
-const mapBackgrounds=new Map(maps.filter(map=>map.backdrop).map(({id})=>[`/art/backgrounds/${id}.jpg`,`art/backgrounds/${id}.jpg`]));
+const mapBackgrounds=new Map(maps.filter(map=>map.backdrop).map(({id,backdrop})=>{
+  const path=`art/backgrounds/${backdrop.file??`${id}.jpg`}`;
+  return [`/${path}`,path];
+}));
 const sharePreview='/art/brand/vk-link-preview-1200x630.jpg';
 const gameBanner='/art/brand/sector04-game-1920x1080.jpg';
 const hostAuthority=/^(?:\[[a-f\d:.]+\]|[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?(?:\.[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?)*\.?)(?::\d{1,5})?$/i;
