@@ -251,10 +251,10 @@ function createMapPreview(map){
     image.src=`/art/maps/${map.id}.webp`;image.alt='';image.decoding='async';image.onerror=()=>{image.replaceWith(createTeamThumbnail(map));};
     return image;
   }
-  const cached=mapButtons.get(map.id)?.querySelector('.map-thumbnail canvas');
-  if(!cached)return createTeamThumbnail(map);
-  const preview=cached.cloneNode();
-  preview.getContext('2d').drawImage(cached,0,0);
+  const preview=document.createElement('span');
+  preview.className='team-map-preview';
+  preview.textContent=map.number;
+  preview.setAttribute('aria-hidden','true');
   return preview;
 }
 function createMapChoice(map){
@@ -281,12 +281,18 @@ function activateMatchMode(mode){
   if(!maps.length)return;
   selectedMatchMode=mode;
   const saved=mapSelections.get(mode);
-  showMapPreview(maps.some(map=>map.id===saved)?saved:maps[0].id);
+  const nextMap=maps.some(map=>map.id===saved)?saved:maps[0].id;
+  syncMapChoices(nextMap);
+  showMapPreview(nextMap);
 }
-for(const button of mapModes)button.addEventListener('click',event=>{
+function chooseMatchMode(event){
   event.preventDefault();
-  activateMatchMode(button.dataset.matchMode);
-});
+  activateMatchMode(event.currentTarget.dataset.matchMode);
+}
+for(const button of mapModes){
+  button.addEventListener('pointerdown',chooseMatchMode);
+  button.addEventListener('click',chooseMatchMode);
+}
 const onlineCount=$('onlineCount');
 let onlineRefresh=false;
 async function refreshOnline(){

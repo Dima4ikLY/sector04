@@ -1349,6 +1349,20 @@ footer { margin-top: 20px; padding: 16px 0 22px; border-color: var(--line); colo
   margin-bottom: 12px;
   border-bottom: 1px solid #2c3a46;
 }
+.map-modes {
+  position: relative;
+  z-index: 2;
+}
+.map-choices .team-map-preview {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #304858, #18232d 55%, #5d4430);
+  color: #fff0dc;
+  font: 700 clamp(22px, 3vw, 36px)/1 var(--display);
+  letter-spacing: .08em;
+}
 .sidebar .mode-buttons .mode-button {
   min-height: 58px;
   border-radius: 7px;
