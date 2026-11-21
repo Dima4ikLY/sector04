@@ -490,7 +490,7 @@ export function createArenaServer({
       Object.assign(files,{'/operations.css':'operations.css','/operations-panels.css':'operations-panels.css','/actor-motion.mjs':'actor-motion.mjs','/death-motion.mjs':'death-motion.mjs','/arena-effects.mjs':'arena-effects.mjs',
         '/grenade-effects.mjs':'grenade-effects.mjs','/skin-effects.mjs':'skin-effects.mjs','/skin-transitions.mjs':'skin-transitions.mjs',
         '/map-interactives.mjs':'map-interactives.mjs','/tidal-station.mjs':'tidal-station.mjs','/pickups.mjs':'pickups.mjs','/pickup-effects.mjs':'pickup-effects.mjs','/covers.mjs':'covers.mjs',
-        '/hud-metrics.mjs':'hud-metrics.mjs','/minimap.mjs':'minimap.mjs','/touch-input.mjs':'touch-input.mjs',
+        '/hud-metrics.mjs':'hud-metrics.mjs','/minimap.mjs':'minimap.mjs','/touch-input.mjs':'touch-input.mjs','/touch-layout.mjs':'touch-layout.mjs',
         '/team-bots.mjs':'team-bots.mjs','/team-routes.mjs':'team-routes.mjs',
         '/art/arena-atlas.png':'art/arena-atlas.png','/audio/weapon-shots.wav':'audio/weapon-shots.wav',
         '/audio/mechanisms.wav':'audio/mechanisms.wav','/audio/footsteps.wav':'audio/footsteps.wav',

@@ -206,6 +206,21 @@
               <button type="button" id="tidalDown" data-control="down" aria-label="Вниз. С прыжком — спуск сквозь платформу" hidden>↓</button>
             </div>
           </div>
+          <div id="touchLayoutBounds" aria-hidden="true"></div>
+          <button type="button" id="openTouchLayout" aria-label="Расположение кнопок" title="Расположение кнопок" hidden>⚙</button>
+          <section id="touchLayoutTools" class="touch-layout-tools" aria-label="Раскладка управления" hidden>
+            <div class="touch-layout-row">
+              <strong id="touchLayoutOrientation">Раскладка</strong>
+              <button type="button" id="touchLayoutReset">Сбросить</button>
+              <button type="button" id="touchLayoutCancel">Отмена</button>
+              <button type="button" id="touchLayoutSave">Сохранить</button>
+            </div>
+            <div class="touch-layout-row">
+              <select id="touchLayoutSelected" aria-label="Кнопка для настройки"></select>
+              <button type="button" id="touchLayoutVisibility">Скрыть</button>
+            </div>
+            <p>Перетащи кнопки. Скрытые отмечены пунктиром.</p>
+          </section>
           <button type="button" id="exitFullscreen" aria-label="Выйти из полноэкранного режима">↙</button>
           </div>
           <div class="arena-bottom"><div><span class="map-icon">▧</span><span><strong id="activeMapName">Литейная</strong><small id="activeMapDetails">Промышленная арена</small><small id="tidalControlsHint" hidden>В воде: прыжок — вверх, присед — вниз. Вниз + прыжок — спуск сквозь платформу.</small></span></div><div class="map-facts"><span id="arenaCapacity">До 6 игроков</span><i></i><span>3 минуты</span><i></i><span id="arenaRules">Каждый за себя</span></div><div id="battleIntroDock" class="battle-intro-dock"></div></div>

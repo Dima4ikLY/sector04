@@ -32,11 +32,13 @@ import {drawMinimap} from './minimap.mjs';
 import {pickBattleTip} from './battle-tips.mjs';
 import {advanceBattleCue,BATTLE_START_NOTICE_MS} from './battle-cues.mjs';
 import {createTouchPresses,nearestVisibleAimPoint,sampleJoystick} from './touch-input.mjs';
+import {createTouchLayoutEditor} from './touch-layout.mjs';
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');
 const hudCanvas=$('hudCanvas'),hud=hudCanvas.getContext('2d');
 const battleSurface=$('battleSurface');
 const arenaExpanded=()=>document.fullscreenElement===battleSurface||battleSurface.hasAttribute('data-expanded');
 let wantsBattleFullscreen=false,fullscreenRequestPending=false;
+let touchLayoutPreview=false;
 let arenaBounds=null,displaySize=null,displayDensity=0;
 new ResizeObserver(([entry])=>{arenaBounds=entry.contentRect;displaySize=null;}).observe(hudCanvas);
 const matchNames={ffa:'Онлайн-матч','1v1':'Дуэль 1×1','2v2':'Командный 2×2','3v3':'Командный 3×3'};
@@ -113,8 +115,32 @@ function applySettings(value){
   document.querySelectorAll('[data-keybind]').forEach(label=>{
     label.textContent=keyLabel(value.bindings[label.dataset.keybind]);
   });
+  touchLayoutEditor.refresh();
 }
-const settings=createSettings({mount:$('settingsMount'),onChange:applySettings});applySettings(settings.value);
+function openTouchLayout(){
+  if(touch)touchLayoutEditor.open();
+}
+const settings=createSettings({mount:$('settingsMount'),onChange:applySettings,onEditTouchPositions:openTouchLayout});
+const touchLayoutEditor=createTouchLayoutEditor({
+  surface:battleSurface,controls:$('touchControls'),bounds:$('touchLayoutBounds'),tools:$('touchLayoutTools'),
+  read:()=>preferences.touchPositions,save:positions=>settings.setTouchPositions(positions),
+  onEdit(active){
+    const root=document.documentElement;
+    clearControls();
+    if(active){
+      touchLayoutPreview=!root.classList.contains('arena-visible');
+      if(touchLayoutPreview)root.classList.add('arena-visible');
+    }else if(touchLayoutPreview){
+      root.classList.remove('arena-visible');
+      touchLayoutPreview=false;
+    }
+    displaySize=null;
+    syncTouchControls();
+    if(!active)(session?canvas:$('settingsMount').querySelector('button'))?.focus({preventScroll:true});
+  }
+});
+applySettings(settings.value);
+$('openTouchLayout').onclick=openTouchLayout;
 const matchHistory=createMatchHistory({mount:$('historyMount')});
 const practiceGuide=createPracticeGuide({
   mount:$('practiceGuide'),
@@ -484,7 +510,7 @@ function clearBattleIntro(){
 }
 const landscapeView=matchMedia('(orientation: landscape)');
 function scrollToBattle(behavior='instant'){
-  if(arenaExpanded())return;
+  if(arenaExpanded()||touchLayoutEditor.active)return;
   const viewport=$('viewport');
   if(touch)viewport.closest('.arena-panel').scrollIntoView({behavior:'instant',block:'start'});
   else viewport.scrollIntoView({behavior,block:'center'});
@@ -545,7 +571,9 @@ function showQueueConnection(mode,mapId){
 }
 function syncTouchControls(){
   const hidden=!session||!touch||battleLocked()||world.ended||world.coop?.phase==='waiting';
-  if($('touchControls').hidden!==hidden)$('touchControls').hidden=hidden;
+  const editing=touchLayoutEditor.active,controlsHidden=hidden&&!editing;
+  if($('touchControls').hidden!==controlsHidden)$('touchControls').hidden=controlsHidden;
+  if($('openTouchLayout').hidden!==(hidden||editing))$('openTouchLayout').hidden=hidden||editing;
 }
 function syncPlayHud(locked){
   $('matchHud').hidden=locked;
@@ -592,7 +620,7 @@ function syncMatchQueue(initial=false){
   return waiting;
 }
 async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,mapId=matchMode?lobbyMap(matchMode):practiceMap(),roomOptions=undefined){
-  if(joining||session)return;joining=true;clearControls();$('error').textContent='';document.querySelectorAll('#lobby button').forEach(b=>b.disabled=true);
+  if(joining||session||touchLayoutEditor.active)return;joining=true;clearControls();$('error').textContent='';document.querySelectorAll('#lobby button').forEach(b=>b.disabled=true);
   document.documentElement.classList.add('arena-visible');
   syncMapChoices(selectedMap);
   battleAudioReady=audio.unlock().catch(()=>{});
@@ -701,7 +729,9 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
   }
 }
 async function leave({keepArena=false}={}){
-  if(!session)return;const old=session;session=null;stream?.close();stream=null;clearControls();motion.reset();canvas.style.cursor='default';
+  if(!session)return;
+  touchLayoutEditor.close();
+  const old=session;session=null;stream?.close();stream=null;clearControls();motion.reset();canvas.style.cursor='default';
   const fullscreenExit=keepArena?undefined:exitBattleFullscreen();
   if(!keepArena)document.documentElement.classList.remove('arena-visible');
   audio.stopSlides();
@@ -712,7 +742,7 @@ async function leave({keepArena=false}={}){
   practiceGuide.reset();
   $('scoreTitle').closest('.score-card').hidden=!!(old.range||old.coop||!$('scoreContent').childElementCount);
   armory.setPlaying(false);roomBrowser.setPlaying(false);feedback.reset();$('connectionBanner').hidden=true;
-  for(const id of ['session','matchHud','playerHud','touchControls','deathMessage','reloadIndicator','medkitIndicator','queueOverlay'])$(id).hidden=true;
+  for(const id of ['session','matchHud','playerHud','touchControls','openTouchLayout','deathMessage','reloadIndicator','medkitIndicator','queueOverlay'])$(id).hidden=true;
   for(const id of ['lobby','mapTag','previewLabel'])$(id).hidden=false;
   $('killfeed').replaceChildren();$('scoreTitle').textContent='ПОСЛЕДНИЙ БОЙ';$('connection').textContent='ПРЕВЬЮ КАРТЫ';showMapPreview(lobbyMap(selectedMatchMode));
   const pending=(async()=>{try{const result=await api('leave',{token:old.token});if(!session)armory.setProfile(result.profile);}catch{}})();
@@ -794,7 +824,9 @@ function toggleFullscreen(){
 $('fullscreen').onclick=toggleFullscreen;
 $('exitFullscreen').onclick=toggleFullscreen;
 document.addEventListener('keydown',event=>{
-  if(event.key!=='Escape'||!battleSurface.hasAttribute('data-expanded')||document.querySelector('dialog[open]'))return;
+  if(event.key!=='Escape'||document.querySelector('dialog[open]'))return;
+  if(touchLayoutEditor.active){event.preventDefault();touchLayoutEditor.close();return;}
+  if(!battleSurface.hasAttribute('data-expanded'))return;
   event.preventDefault();
   void exitBattleFullscreen();
 });
@@ -811,6 +843,7 @@ $('sound').onclick=async()=>{
 function isEditing(){return ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)||!!document.querySelector('dialog[open]');}
 function canControl(){
   return !!session&&!isEditing()&&!document.hidden&&!world.ended
+    &&!touchLayoutEditor.active
     &&!battleLocked()
     &&(!session.coop||world.coop&&world.coop.phase!=='waiting')
     &&world.players.some(player=>player.id===session.id&&player.dead<=0)
@@ -888,6 +921,7 @@ touchMedia.addEventListener('change',event=>{
   touch=event.matches;
   mouseAim=false;
   document.documentElement.toggleAttribute('data-touch-combat',touch);
+  if(!touch)touchLayoutEditor.close();
   syncTouchControls();
   if(touch&&session&&!arenaExpanded())scrollToBattle();
 });
@@ -1109,7 +1143,7 @@ function updateHud(){
   const reloading=me.reload>0&&me.dead<=0&&!world.ended,progress=Math.max(0,Math.min(100,100*(1-me.reload/weapons[me.weapon].reload)));
   $('reloadIndicator').hidden=!reloading;$('reloadProgress').style.width=`${progress}%`;$('reloadIndicator').setAttribute('aria-valuenow',Math.round(progress));$('reloadTime').textContent=`${Math.max(0,me.reload).toFixed(1)} с`;
   $('jetHud').hidden=!me.hasJetpack;$('jetFuel').textContent=`${Math.ceil(me.jetFuel)}%`;$('jetFuelBar').style.width=`${me.jetFuel}%`;$('jetButton').hidden=!me.hasJetpack;
-  $('jetButton').disabled=!!me.medkit;
+  $('jetButton').disabled=!!me.medkit&&!touchLayoutEditor.active;
   if(me.medkit)touchKeys.delete('jet');
   $('jetHud').toggleAttribute('data-healing',!!me.medkit);
   $('jetHealHint').hidden=!me.medkit;

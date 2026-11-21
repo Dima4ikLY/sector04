@@ -1749,9 +1749,9 @@ html[data-touch-combat] .viewport #reloadIndicator {
 html[data-touch-combat] .viewport #reloadIndicator > div:first-child { gap: 4px; font-size: 8px; letter-spacing: 0; }
 html[data-touch-combat] .viewport .grenade-aim-hint { max-width: 95%; padding: 4px 6px; font-size: 9px; }
 
-html:has(.battle-surface[data-expanded]) { overflow: hidden; }
-.battle-surface[data-expanded] { position: fixed; inset: 0; z-index: 1000; }
-.battle-surface:is(:fullscreen,[data-expanded]) {
+html:has(.battle-surface:is([data-expanded],[data-touch-editing])) { overflow: hidden; }
+.battle-surface:is([data-expanded],[data-touch-editing]):not(:fullscreen) { position: fixed; inset: 0; z-index: 1000; }
+.battle-surface:is(:fullscreen,[data-expanded],[data-touch-editing]) {
   width: 100%;
   height: 100%;
   height: 100dvh;
@@ -1762,14 +1762,14 @@ html:has(.battle-surface[data-expanded]) { overflow: hidden; }
   overflow: auto;
   background: #101821;
 }
-#battleSurface:is(:fullscreen,[data-expanded]) > .viewport {
+#battleSurface:is(:fullscreen,[data-expanded],[data-touch-editing]) > .viewport {
   width: min(100%, calc(100vh * 16 / 9));
   width: min(100%, calc(100dvh * 16 / 9));
   min-height: 0;
   aspect-ratio: 16 / 9;
   flex: none;
 }
-#battleSurface:is(:fullscreen,[data-expanded]) > .viewport > canvas { object-fit: contain; }
+#battleSurface:is(:fullscreen,[data-expanded],[data-touch-editing]) > .viewport > canvas { object-fit: contain; }
 .battle-surface:is(:fullscreen,[data-expanded]) > #exitFullscreen {
   position: absolute;
   inset: env(safe-area-inset-top) max(5px, env(safe-area-inset-right)) auto auto;
@@ -1792,7 +1792,8 @@ html:not([data-touch-combat]) .battle-surface:is(:fullscreen,[data-expanded]) .v
   html[data-touch-combat] .viewport .player-hud { max-width: calc(100% - 14px); gap: 4px 5px; }
   html[data-touch-combat] .viewport .killfeed { top: 82px; }
   html[data-touch-combat] .battle-surface > .touch-controls {
-    position: static;
+    position: relative;
+    inset: auto;
     width: 100%;
     padding: 8px max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
     align-items: center;
@@ -1806,8 +1807,8 @@ html:not([data-touch-combat]) .battle-surface:is(:fullscreen,[data-expanded]) .v
   }
   html[data-touch-combat] .viewport:has(.interaction-button:not([hidden])) #reloadIndicator { bottom: 52px; }
   html[data-touch-combat] .viewport .grenade-aim-hint { bottom: 53px; }
-  html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) { padding: max(49px, env(safe-area-inset-top)) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-  html[data-touch-combat] #battleSurface:is(:fullscreen,[data-expanded]) > .viewport { width: 100%; }
+  html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded],[data-touch-editing]) { padding: max(49px, env(safe-area-inset-top)) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  html[data-touch-combat] #battleSurface:is(:fullscreen,[data-expanded],[data-touch-editing]) > .viewport { width: 100%; }
 }
 
 @media (orientation: landscape) {
@@ -1837,13 +1838,79 @@ html:not([data-touch-combat]) .battle-surface:is(:fullscreen,[data-expanded]) .v
   }
   html[data-touch-combat] .viewport #reloadIndicator { inset: 36px auto auto 50%; transform: translateX(-50%); }
   html[data-touch-combat] .viewport .grenade-aim-hint { bottom: calc(2 * var(--touch-action-size) + 18px); }
-  html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) {
+  html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded],[data-touch-editing]) {
     padding-block: env(safe-area-inset-top) env(safe-area-inset-bottom);
   }
-  html[data-touch-combat] #battleSurface:is(:fullscreen,[data-expanded]) > .viewport {
+  html[data-touch-combat] #battleSurface:is(:fullscreen,[data-expanded],[data-touch-editing]) > .viewport {
     width: min(calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right)), calc((100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9));
     width: min(calc(100% - env(safe-area-inset-left) - env(safe-area-inset-right)), calc((100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 16 / 9));
   }
   html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) .viewport #matchGoal { margin-right: 43px; }
   html[data-touch-combat] .battle-surface .viewport.match-active.finished { min-height: 0; }
 }
+
+.settings-dialog .settings-touch-edit { margin-top: 12px; min-height: 42px; }
+html:not([data-touch-combat]) .settings-dialog .settings-touch-edit { display: none; }
+#touchLayoutBounds {
+  position: absolute;
+  inset: calc(env(safe-area-inset-top) + 108px) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  pointer-events: none;
+}
+#openTouchLayout {
+  position: absolute;
+  z-index: 19;
+  inset: env(safe-area-inset-top) max(5px, env(safe-area-inset-right)) auto auto;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid #617787;
+  border-radius: 4px;
+  background: #15222df2;
+  color: #fff4df;
+  font-size: 21px;
+}
+.battle-surface:is(:fullscreen,[data-expanded]) > #openTouchLayout { right: calc(max(5px, env(safe-area-inset-right)) + 47px); }
+html[data-touch-combat] .battle-surface:has(> #openTouchLayout:not([hidden])) .viewport #matchGoal { margin-inline-end: 43px; }
+html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]):has(> #openTouchLayout:not([hidden])) .viewport #matchGoal { margin-inline-end: 90px; }
+@media (orientation: portrait) {
+  html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) .viewport #matchGoal { margin-inline-end: 0; }
+}
+.battle-surface .touch-controls :is(#touchJoystick,[data-control]) { translate: var(--layout-x, 0px) var(--layout-y, 0px); }
+.battle-surface:not([data-touch-editing]) .touch-controls [data-layout-hidden] { visibility: hidden; pointer-events: none; }
+.battle-surface[data-touch-editing] > .touch-controls { display: flex; z-index: 23; }
+.battle-surface[data-touch-editing] .touch-actions [hidden] { display: grid !important; }
+.battle-surface[data-touch-editing] .touch-controls :is(#touchJoystick,[data-control]) { cursor: grab; touch-action: none; }
+.battle-surface[data-touch-editing] .touch-controls [data-layout-selected] { z-index: 1; outline: 2px solid #ffcf90; outline-offset: 2px; }
+.battle-surface[data-touch-editing] .touch-controls [data-layout-hidden] { opacity: .55; outline: 1px dashed #f6dbb8; outline-offset: 1px; }
+.battle-surface[data-touch-editing] .touch-controls [data-layout-hidden][data-layout-selected] { outline: 2px dashed #ffcf90; }
+.battle-surface[data-touch-editing] :is(#result,#exitFullscreen) { visibility: hidden; }
+.touch-layout-tools {
+  position: absolute;
+  z-index: 24;
+  top: max(4px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100% - 16px), 450px);
+  padding: 6px;
+  border: 1px solid #506776;
+  border-radius: 8px;
+  background: #111d28f5;
+  color: #eef4fb;
+}
+.touch-layout-row { display: flex; align-items: center; gap: 4px; }
+.touch-layout-row + .touch-layout-row { margin-top: 4px; }
+.touch-layout-row :is(strong,select) { flex: 1; min-width: 0; }
+.touch-layout-row strong { padding-inline: 3px; font-size: 12px; }
+.touch-layout-row :is(button,select) {
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid #4b616f;
+  border-radius: 4px;
+  color: #eef4fb;
+  background: #243542;
+  font-size: 12px;
+}
+.touch-layout-row #touchLayoutSave { border-color: #e6af6e; background: #ffd297; color: #27190b; font-weight: 700; }
+.touch-layout-tools p { margin: 4px 3px 0; color: #bac9d5; font-size: 10px; line-height: 1.2; }

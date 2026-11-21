@@ -1,4 +1,5 @@
 import {assignBinding,defaultBindings,keyActions,keyLabel,normalizeBindings} from './keybinds.mjs';
+import {normalizeTouchPositions} from './touch-layout.mjs';
 
 export const defaultSettings=Object.freeze({volume:65,musicVolume:45,renderer:'3d',fpsLimit:'auto',effects:true,showFps:false,touchLayout:'left',bindings:defaultBindings});
 const storageKey='sector-settings';
@@ -14,6 +15,7 @@ function validate(value){
     effects:typeof v.effects==='boolean'?v.effects:defaultSettings.effects,
     showFps:typeof v.showFps==='boolean'?v.showFps:defaultSettings.showFps,
     touchLayout:v.touchLayout==='right'?'right':defaultSettings.touchLayout,
+    touchPositions:normalizeTouchPositions(v.touchPositions),
     bindings:normalizeBindings(v.bindings)
   };
 }
@@ -28,7 +30,7 @@ export function saveSettings(value,storage){
   return next;
 }
 
-export function createSettings({mount,onChange=()=>{}}){
+export function createSettings({mount,onChange=()=>{},onEditTouchPositions=()=>{}}){
   let value=readSettings(),capture=null;
   const id=`sector-settings-${++panelNumber}`,button=document.createElement('button'),dialog=document.createElement('dialog');
   button.type='button';button.className='settings-open text-btn';button.textContent='Настройки';button.setAttribute('aria-haspopup','dialog');button.setAttribute('aria-controls',id);
@@ -39,7 +41,7 @@ export function createSettings({mount,onChange=()=>{}}){
       <div class="settings-field"><label for="${id}-music-volume">Музыка в бою <output id="${id}-music-value" for="${id}-music-volume"></output></label><input id="${id}-music-volume" type="range" min="0" max="100" step="1" aria-describedby="${id}-music-note"><small id="${id}-music-note">Отдельная громкость музыки. 0% — только звуки игры.</small></div>
       <div class="settings-field"><label for="${id}-renderer">Графика</label><select id="${id}-renderer"><option value="3d">Объёмная графика</option><option value="2d">Упрощённая графика</option></select><small>Если игра замедляется, выбери упрощённую графику. Управление и правила боя сохранятся.</small></div>
       <div class="settings-field"><label for="${id}-fps-limit">Лимит FPS</label><select id="${id}-fps-limit" aria-describedby="${id}-fps-note"><option value="auto">Авто (по частоте экрана)</option><option value="60">До 60 FPS</option><option value="90">До 90 FPS</option></select><small id="${id}-fps-note">Фактическая частота кадров зависит от частоты экрана и производительности устройства.</small></div>
-      <div class="settings-field"><label for="${id}-touch-layout">Управление на телефоне</label><select id="${id}-touch-layout"><option value="left">Джойстик слева</option><option value="right">Джойстик справа</option></select><small>Ходьба, прыжок и присед управляются круглым джойстиком. Боевые кнопки автоматически переедут на другую сторону.</small></div>
+      <div class="settings-field"><label for="${id}-touch-layout">Управление на телефоне</label><select id="${id}-touch-layout"><option value="left">Джойстик слева</option><option value="right">Джойстик справа</option></select><small>Сторона для стандартной раскладки.</small><button type="button" class="secondary settings-touch-edit">Расположение кнопок ↗</button></div>
       <label class="settings-toggle" for="${id}-effects"><span><strong>Эффекты боя</strong><small>Вспышки, искры, частицы и эффекты обликов.</small></span><input id="${id}-effects" type="checkbox"></label>
       <label class="settings-toggle" for="${id}-fps"><span><strong>Показывать FPS</strong><small>Частота кадров рядом с ареной.</small></span><input id="${id}-fps" type="checkbox"></label>
       <details class="settings-bindings">
@@ -57,7 +59,7 @@ export function createSettings({mount,onChange=()=>{}}){
   const musicVolume=find(`#${id}-music-volume`),musicValue=find(`#${id}-music-value`);
   const bindingsPanel=find('.settings-bindings'),keyStatus=find('.settings-key-status');
   const keyButtons=[...dialog.querySelectorAll('[data-key-action]')];
-  function copyValue(){return {...value,bindings:{...value.bindings}};}
+  function copyValue(){return {...value,bindings:{...value.bindings},touchPositions:normalizeTouchPositions(value.touchPositions)};}
   function syncKeys(){
     for(const keyButton of keyButtons){
       const {keyAction}=keyButton.dataset,active=capture===keyAction,label=keyLabel(value.bindings[keyAction]);
@@ -117,6 +119,10 @@ export function createSettings({mount,onChange=()=>{}}){
   renderer.addEventListener('change',()=>apply({...value,renderer:renderer.value}));
   fpsLimit.addEventListener('change',()=>apply({...value,fpsLimit:fpsLimit.value==='auto'?'auto':Number(fpsLimit.value)}));
   touchLayout.addEventListener('change',()=>apply({...value,touchLayout:touchLayout.value}));
+  find('.settings-touch-edit').addEventListener('click',()=>{
+    dialog.close();
+    onEditTouchPositions();
+  });
   effects.addEventListener('change',()=>apply({...value,effects:effects.checked}));
   fps.addEventListener('change',()=>apply({...value,showFps:fps.checked}));
   find('.settings-reset').addEventListener('click',()=>{
@@ -124,5 +130,5 @@ export function createSettings({mount,onChange=()=>{}}){
     apply(defaultSettings);
   });
   sync();
-  return {get value(){return copyValue();},open};
+  return {get value(){return copyValue();},open,setTouchPositions:touchPositions=>apply({...value,touchPositions})};
 }
