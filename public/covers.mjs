@@ -1,6 +1,4 @@
-// Cover zones on each arena. A fighter standing or crouching inside them is
-// hidden from opponents unless both are inside the same cover. Firing through
-// the cover works because the leaves stay out of the muzzle line.
+// Foliage conceals fighters, but is never a physical collider for shots.
 export const coverDefinitions={
   foundry:[{x:290,y:760,w:120,h:96},{x:700,y:760,w:130,h:96},{x:1120,y:760,w:120,h:96}],
   canyon:[{x:240,y:760,w:130,h:96},{x:700,y:760,w:120,h:96},{x:1500,y:760,w:130,h:96},{x:2230,y:760,w:120,h:96},{x:2820,y:760,w:130,h:96}],
@@ -36,7 +34,49 @@ export const coverDefinitions={
 
 const cache=new WeakMap();
 
+function groundedCovers(map){
+  const platforms=(map.platforms??[]).filter(surface=>!surface.mechanismId);
+  const obstacles=[...platforms,...(map.solids??[]).filter(surface=>!surface.mechanismId),
+    ...(map.mechanisms??[]).map(mechanism=>mechanism.type==='lift'
+      ?{x:mechanism.x,y:mechanism.top,w:mechanism.w,h:mechanism.bottom-mechanism.top+mechanism.h}
+      :mechanism)];
+  const placed=[];
+  for(const definition of coverDefinitions[map.id]??[]){
+    let found,bestScore=Infinity;
+    for(const h of [definition.h,80,64]){
+      for(const w of [...new Set([definition.w,96,80])]){
+        const maxX=map.width-w-8;
+        const candidates=new Set([Math.max(8,Math.min(maxX,definition.x)),maxX]);
+        for(let x=8;x<=maxX;x+=8)candidates.add(x);
+        const ordered=[...candidates].sort((a,b)=>Math.abs(a-definition.x)-Math.abs(b-definition.x));
+        const x=ordered.find(x=>platforms.some(surface=>surface.y===definition.y&&x>=surface.x&&x+w<=surface.x+surface.w)&&
+          !obstacles.some(rect=>x<rect.x+rect.w+6&&x+w>rect.x-6&&definition.y>rect.y&&definition.y-h<rect.y+rect.h)&&
+          !placed.some(cover=>x<cover.x+cover.w+20&&x+w>cover.x-20));
+        if(x!==undefined){
+          const score=Math.abs(x-definition.x)+2*(definition.w-w+definition.h-h);
+          if(score<bestScore){found={...definition,x,w,h};bestScore=score;}
+        }
+      }
+    }
+    if(found)placed.push(found);
+  }
+  return placed;
+}
+
 export function getMapCovers(map){
-  if(!cache.has(map))cache.set(map,coverDefinitions[map.id]??[]);
-  return cache.get(map);
+  // Mechanism snapshots copy the map every tick, but keep static slabs shared.
+  const key=map.platforms?.find(surface=>!surface.mechanismId)??map;
+  let entry=cache.get(key);
+  if(!entry||entry.id!==map.id){entry={id:map.id,covers:groundedCovers(map)};cache.set(key,entry);}
+  return entry.covers;
+}
+
+export function coverAt(map,x,y){
+  return getMapCovers(map).find(cover=>x>=cover.x&&x<=cover.x+cover.w&&y>=cover.y-cover.h&&y<=cover.y)??null;
+}
+
+export function isConcealedFrom(map,viewer,target){
+  if(!target||target.dead>0||target.hp<=0)return false;
+  const cover=coverAt(map,target.x,target.y);
+  return !!cover&&(!viewer||coverAt(map,viewer.x,viewer.y)!==cover);
 }

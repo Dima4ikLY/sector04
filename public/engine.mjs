@@ -7,7 +7,7 @@ import {advanceMechanisms,createMechanisms,mapWithMechanisms,nearbyMechanism,tri
 import {BUFF_SPAWN,getMapBuffSpawns,getMapPickups,PICKUP_NOTICE_DURATION,PICKUP_TYPES} from './pickups.mjs';
 import {teamBotInput} from './team-bots.mjs';
 import {deathFallContactDelay} from './death-motion.mjs';
-import {getMapCovers} from './covers.mjs';
+import {isConcealedFrom} from './covers.mjs';
 export const W=VIEW_W,H=VIEW_H,ROUND=180,TARGET=15;
 export const COOP_CAPACITY=3;
 const COOP_WAVES=3, COOP_BREAK=4;
@@ -556,22 +556,6 @@ function areOpponents(world,source,target){
   if(world.teams)return source?.team===0&&target.team===1||source?.team===1&&target.team===0;
   return !world.coop||!!source&&source.bot!==target.bot;
 }
-function coverAt(map,x,y){
-  for(const cover of getMapCovers(map))if(x>=cover.x&&x<=cover.x+cover.w&&y>=cover.y-cover.h&&y<=cover.y)return cover;
-  return null;
-}
-function inCover(player,map){
-  return coverAt(map,player.x,player.y);
-}
-function visibleTo(world,player,target,map){
-  if(!target||target.dead>0||target.hp<=0)return false;
-  if(!player||player.dead>0||player.hp<=0)return false;
-  const ownCover=inCover(player,map),targetCover=inCover(target,map);
-  if(ownCover&&targetCover&&ownCover===targetCover)return true;
-  // Цель в укрытии и стрелок не там же — цель скрыта. Стрелок в укрытии видит всё.
-  if(targetCover)return false;
-  return true;
-}
 function explode(world,obstacles,source,{owner,radius,power,time=world.time,weapon,bulletId}){
   const event=audioEvent(world,'explosion',source,weapon,time);
   world.effects.push({...event,type:'explosion',bulletId,life:GRENADE_EFFECT_DURATION+.05,color:'#ffb357'});
@@ -711,8 +695,8 @@ export function botInput(p,world,dt=1/60,map=mapWithMechanisms(getMap(world.mapI
     const input=teamBotInput(p,world,dt,map,shotOriginHeight);
     if(input)return input;
   }
-  const targets=world.players.filter(t=>t!==p&&t.dead<=0&&areOpponents(world,p,t)).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
-  const t=targets[0];if(!t)return {};
+  const targets=world.players.filter(t=>t!==p&&t.dead<=0&&t.hp>0&&areOpponents(world,p,t)&&!isConcealedFrom(map,p,t)).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
+  const t=targets[0];if(!t){p.botTarget=undefined;return {reload:p.ammo===0};}
   const dx=t.x-p.x,dy=t.y-p.y,muzzleHeight=shotOriginHeight(p.stance),aimY=dy+muzzleHeight-shotOriginHeight(t.stance);
   const cover=map.solids??[],obstacles=[...map.platforms,...cover];
   let clear=true;for(let i=1;i<20;i++){const x=p.x+dx*i/20,y=p.y-muzzleHeight+aimY*i/20;if(obstacles.some(s=>x>s.x&&x<s.x+s.w&&y>s.y&&y<s.y+s.h)){clear=false;break;}}
@@ -909,7 +893,8 @@ export function step(world,dt) {
         b.life=0;
         break;
       }
-  const hit=world.players.find(p=>p.id!==b.owner&&p.dead<=0&&areOpponents(world,shooter,p)&&Math.abs(b.x-p.x)<stances[p.stance].halfWidth+2&&b.y>p.y-p.stanceHeight&&b.y<p.y&&visibleTo(world,shooter,p,map));
+      // Foliage conceals a fighter from targeting, but never blocks a real projectile.
+      const hit=world.players.find(p=>p.id!==b.owner&&p.dead<=0&&areOpponents(world,shooter,p)&&Math.abs(b.x-p.x)<stances[p.stance].halfWidth+2&&b.y>p.y-p.stanceHeight&&b.y<p.y);
       if(hit){
         if(rocket)explodeRocket(world,obstacles,b,b.x,b.y,world.time+dt-flight*(k+1)/n);
         else{

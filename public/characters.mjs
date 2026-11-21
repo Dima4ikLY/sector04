@@ -485,7 +485,7 @@ export function drawCharacter(c,p,{time=0,me=false,angle=p.angle||0,weapon=null,
   let muzzle;
   c.save();
   c.translate(x,y);
-  c.globalAlpha=pose.alpha*(p.buffs?.transparent>0?TRANSPARENT_OPACITY:1);
+  c.globalAlpha=pose.alpha*(p.buffs?.transparent>0?TRANSPARENT_OPACITY:1)*(p.coverOpacity??1);
   if(!(death?p.airborne:pose.airborne))ellipse(c,pose.bodyX*armDrop,1.5,21+pose.prone*8+6*pose.slide+5*armDrop,3.7,'#10171ba0');
   if(body&&pose.alpha>0){
     if(lift)c.translate(0,-lift);

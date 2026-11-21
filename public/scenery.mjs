@@ -1,6 +1,6 @@
 import {arenaLooks,gradient,haze,lamp,line,mechanismAppearance,mechanismLights,pipe,platformDetails,rearDeckSupports,rect,rng,surfaceGrain,teamSpawnBeacon,teamSpawnColors} from './map-detail.mjs';
 import {VIEW_W} from './maps.mjs';
-import {getMapCovers} from './covers.mjs';
+import {coverAt,getMapCovers} from './covers.mjs';
 
 const atlasPanels = {foundry: [0, 0], canyon: [1, 0], harbor: [0, 1], dungeon: [1, 1]};
 const photoFocusY={foundry:.54,canyon:.4,harbor:.72,dungeon:.38,spillway:.86,observatory:.48};
@@ -375,28 +375,45 @@ export function drawMapMechanisms(ctx,map,states=[]) {
   }
 }
 
-export function drawMapCovers(ctx,map){
+const coverImages=new WeakMap();
+function drawFoliage(ctx,{x,y,w,h},seed){
+    const random=rng(seed);
+    ctx.fillStyle='#101b16';
+    ctx.beginPath();ctx.ellipse(x+w/2,y-2,w*.49,5,0,0,Math.PI*2);ctx.fill();
+    rect(ctx,x+w*.46,y-h*.54,w*.08,h*.52,'#59442a');
+    ctx.fillStyle='#203e2a';
+    ctx.beginPath();ctx.ellipse(x+w/2,y-h*.38,w*.49,h*.38,0,0,Math.PI*2);ctx.fill();
+    for(let row=0;row<3;row++){
+      for(let n=0;n<7;n++){
+        const radiusX=w*(.095+random()*.025),radiusY=h*(.17+random()*.035);
+        const cx=x+w*(.12+n*.125),cy=y-h*(.22+row*.25+random()*.06);
+        ctx.fillStyle=['#315c37','#407044','#294d31'][(n+row)%3];
+        ctx.beginPath();ctx.ellipse(cx,cy,radiusX,radiusY,random()*.6-.3,0,Math.PI*2);ctx.fill();
+        if((n+row)%2===0){
+          line(ctx,cx-radiusX*.4,cy+radiusY*.25,cx+radiusX*.45,cy-radiusY*.3,'#86a86666',1.2);
+        }
+      }
+    }
+}
+function coverImage(cover){
+  if(coverImages.has(cover))return coverImages.get(cover);
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.ceil(cover.w+8);canvas.height=Math.ceil(cover.h+10);
+  drawFoliage(canvas.getContext('2d'),{...cover,x:4,y:cover.h+4},Math.round(cover.x*97+cover.y*13+cover.w));
+  coverImages.set(cover,canvas);
+  return canvas;
+}
+
+// Draw on the foreground canvas, above both the flat and WebGL actors.
+export function drawMapCovers(ctx,map,{viewer=null,view=null}={}){
+  const ownCover=viewer&&coverAt(map,viewer.x,viewer.y);
   for(const cover of getMapCovers(map)){
-    const baseY=cover.y;
-    // Trunk and shadow stay subtle, the foliage is what hides the fighter.
-    rect(ctx,cover.x+cover.w/2-6,baseY-52,12,52,'#3b2d1e');
-    rect(ctx,cover.x+8,baseY-6,cover.w-16,6,'#18201859');
-    for(let n=0;n<7;n++){
-      const cx=cover.x+18+n*(cover.w-36)/6;
-      const cy=baseY-70-((n%3)*16);
-      const radius=30-((n%2)*7);
-      ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);
-      ctx.fillStyle=n%2?'#2c5a35':'#35683d';
-      ctx.fill();
-    }
-    for(let n=0;n<4;n++){
-      const cx=cover.x+26+n*(cover.w-52)/3;
-      const cy=baseY-34-((n%2)*20);
-      const radius=22-(n%2)*5;
-      ctx.beginPath();ctx.arc(cx,cy,radius,0,Math.PI*2);
-      ctx.fillStyle='#40744a';
-      ctx.fill();
-    }
+    if(view&&(cover.x+cover.w<view.x||cover.x>view.x+view.width||cover.y<view.y||cover.y-cover.h>view.y+view.height))continue;
+    ctx.save();
+    // Fade the whole bush once; overlapping leaves must not compound opacity.
+    ctx.globalAlpha*=cover===ownCover ? .38 : .98;
+    ctx.drawImage(coverImage(cover),cover.x-4,cover.y-cover.h-4);
+    ctx.restore();
   }
 }
 
@@ -435,7 +452,6 @@ export function buildScenery(map, {includePlatforms = true, atlas = null, backdr
     });
     for (const s of map.platforms) platformDetails(ctx,s,map);
     for (const s of map.solids || []) platformDetails(ctx,s,map,true);
-    drawMapCovers(ctx,map);
   }
   return canvas;
 }

@@ -4,7 +4,8 @@ import {createArmory} from './shop.mjs';
 import {START_WEAPON,armorForEquipment,helmetForEquipment,ranks,rankIndex,rankUnlocks,rankUnlocksBetween} from './catalog.mjs';
 import {getMap,getMapsForMode} from './maps.mjs';
 import {AimCamera,sampleBlastShake} from './camera.mjs';
-import {buildScenery,drawMapMechanisms} from './scenery.mjs';
+import {buildScenery,drawMapMechanisms,drawMapCovers} from './scenery.mjs';
+import {isConcealedFrom} from './covers.mjs';
 import {teamSpawnColors as teamColors,teamFightColors} from './map-detail.mjs';
 import {mapWithMechanisms,nearbyMechanism} from './map-interactives.mjs';
 import {WeaponAudio} from './audio.mjs';
@@ -284,7 +285,11 @@ async function refreshOnline(){
   if(onlineRefresh||!onlineCount?.isConnected)return;
   onlineRefresh=true;
   try{
-    const response=await fetch('/api/online',{signal:AbortSignal.timeout(4000),cache:'no-store'});
+    const accountToken=armory.profile&&armory.token;
+    const response=await fetch(accountToken?'/api/presence':'/api/online',{
+      ...(accountToken?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accountToken})}:{}),
+      signal:AbortSignal.timeout(4000),cache:'no-store'
+    });
     if(!response.ok)return;
     const data=await response.json();
     if(onlineCount.isConnected&&Number.isFinite(data?.online))onlineCount.textContent=String(Math.max(0,Math.trunc(data.online)));
@@ -292,7 +297,10 @@ async function refreshOnline(){
   finally{onlineRefresh=false;}
 }
 refreshOnline();
+armory.startup.then(refreshOnline);
 setInterval(refreshOnline,12000);
+window.addEventListener('focus',refreshOnline);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshOnline();});
 showMapPreview(selectedMap);
 function toast(message){$('toast').textContent=message;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,3500);}
 async function api(route,data){let response;try{response=await fetch(`/api/${route}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),signal:AbortSignal.timeout(4000)});}catch(error){throw new Error(error.name==='TimeoutError'?'Сервер не ответил вовремя. Попробуй ещё раз.':'Нет связи с сервером. Проверь подключение.');}const result=await response.json();if(!response.ok){const error=new Error(result.error||'Сервер недоступен');error.status=response.status;throw error;}return result;}
@@ -309,6 +317,7 @@ function cycleWeapon(direction){
   return true;
 }
 function renderInventory(profile){
+  queueMicrotask(refreshOnline);
   matchHistory.setProfile(profile.login);
   const jetpackName=profile.equipment?.jetpackLong?'JP-02 LONG':profile.equipment?.jetpack?'JP-01':'не куплен';
   const armor=armorForEquipment(profile.equipment);
@@ -753,7 +762,7 @@ function input(){
   let angle=p?pointerAimAngle(p,map):0;
   if(touch&&p){
     const target=world.players.filter(player=>player!==p&&player.dead<=0&&(!session?.coop||player.coopEnemy)
-      &&(!world.teams||player.team!==p.team))
+      &&(!world.teams||player.team!==p.team)&&!isConcealedFrom(map,p,player))
       .sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y))[0];
     angle=target?Math.atan2(target.y-shotOriginHeight(target.stance)-originY,target.x-p.x):p.angle;
   }
@@ -1285,7 +1294,11 @@ function render(t){
   const viewX=baseX+shake.x,viewY=baseY+shake.y;
   const view={x:viewX,y:viewY,width:W/zoom,height:H/zoom};
   const angle=session&&focus?touch?input().angle:pointerAimAngle(focus,map):0;
-  const players=renderPlayers(scene.players,dt,angle,physicalMap);
+  const concealed=player=>!!session&&player.id!==focus?.id&&
+    !(world.teams&&player.team===focus?.team)&&!(world.coop&&!player.bot)&&
+    isConcealedFrom(map,focus,player);
+  const players=renderPlayers(scene.players,dt,angle,physicalMap).map(player=>
+    concealed(player)?{...player,coverOpacity:.08}:player);
   const draw3D=use3D(),skinEffects=showSkinEffects();
   const {unit,pixel}=prepareArenaLayers(draw3D);
   if(bg3D!==draw3D)bg=scenery(map);
@@ -1299,8 +1312,8 @@ function render(t){
     for(const p of players){
       const transition=sampleSkinTransition(p.appearance?.style,p);
       if(transition?.phase==='spawn')spawnOpacity.set(p.id,transition.alpha);
-      if(!p.buffs?.transparent&&(!transition||transition.phase==='spawn'&&transition.alpha>.65))ambientPlayers.push(p);
-      if(transition&&p.x>viewX-110&&p.x<viewX+view.width+110&&p.y>viewY-100&&p.y<viewY+view.height+130){
+      if(!concealed(p)&&!p.buffs?.transparent&&(!transition||transition.phase==='spawn'&&transition.alpha>.65))ambientPlayers.push(p);
+      if(!concealed(p)&&transition&&p.x>viewX-110&&p.x<viewX+view.width+110&&p.y>viewY-100&&p.y<viewY+view.height+130){
         drawSkinTransition(ctx,p,transition);
       }
     }
@@ -1333,6 +1346,7 @@ function render(t){
   ctx.restore();
   hud.clearRect(0,0,W,H);
   hud.save();hud.scale(zoom,zoom);hud.translate(-viewX,-viewY);
+  drawMapCovers(hud,map,{viewer:focus,view});
   if(session&&!world.ended&&!battleLocked()&&world.coop?.phase!=='waiting'){
     drawMapPickups(hud,scene.pickups,view,{time:t,animate:skinEffects});
     if(skinEffects)drawPickupPulses(hud,scene.arenaEffects,scene.effectTime,view);
@@ -1348,6 +1362,7 @@ function render(t){
   const labelScreen={x:viewX,y:viewY,zoom,width:W,unit,pixel,fadePickups:!reducedMotion.matches};
   for(const p of players){
     if(p.x<viewX||p.x>viewX+view.width||p.y<viewY||p.y>viewY+view.height)continue;
+    if(concealed(p))continue;
     hud.globalAlpha=spawnOpacity.get(p.id)??1;
     drawCharacterLabel(hud,p,{me:p.id===session?.id,ally:!!session?.coop&&!p.bot,
       teamColor:world.teams?teamFightColors[p.team]:teamColors[p.team],pickupNotices:pickupNotices.get(p.id),screen:labelScreen});
@@ -1361,7 +1376,7 @@ function render(t){
     if($('grenadeAimHint').textContent!==hint)$('grenadeAimHint').textContent=hint;
     const points=grenadeTrajectory(focus,physicalMap,angle),end=points.at(-1);hud.save();hud.scale(zoom,zoom);hud.translate(-viewX,-viewY);hud.strokeStyle='#f2ffd2';hud.shadowColor='#162a20';hud.shadowBlur=4;hud.lineWidth=2/zoom;hud.setLineDash([5/zoom,7/zoom]);hud.beginPath();points.forEach((p,i)=>i?hud.lineTo(p.x,p.y):hud.moveTo(p.x,p.y));hud.stroke();hud.setLineDash([]);hud.beginPath();hud.arc(end.x,end.y,9/zoom,0,Math.PI*2);hud.stroke();hud.restore();
   }
-  drawMinimap(hud,{map,physicalMap,players:session?scene.players:[],viewX:baseX,viewY:baseY,viewWidth:view.width,viewHeight:view.height,
+  drawMinimap(hud,{map,physicalMap,players:session?scene.players.filter(player=>!concealed(player)):[],viewX:baseX,viewY:baseY,viewWidth:view.width,viewHeight:view.height,
     focus,width:W,height:H,unit,pixel,touch:touch&&!!session});
   if(session&&!touch&&!world.ended&&!battleLocked()){const p=world.players.find(p=>p.id===session.id);if(p&&p.dead<=0){hud.save();hud.shadowColor='#132b1c';hud.shadowBlur=4;hud.strokeStyle='#e7fac0';hud.lineWidth=2;hud.beginPath();hud.arc(mouse.x,mouse.y,8,0,Math.PI*2);hud.stroke();line(hud,mouse.x-14,mouse.y,mouse.x-5,mouse.y,'#e7fac0',2);line(hud,mouse.x+5,mouse.y,mouse.x+14,mouse.y,'#e7fac0',2);line(hud,mouse.x,mouse.y-14,mouse.x,mouse.y-5,'#e7fac0',2);line(hud,mouse.x,mouse.y+5,mouse.x,mouse.y+14,'#e7fac0',2);hud.restore();}}
   if(holding('score')&&session&&!session.range&&!session.coop&&!battleLocked())drawScoreboard();

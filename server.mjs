@@ -119,15 +119,28 @@ export function createArenaServer({
   dataFile=process.env.PROFILE_DATA_FILE||fileURLToPath(new URL('./data/profiles.json',import.meta.url)),
   matchmakingWaitMs=10000,
   battleCountdownMs=3000,
+  presenceTimeoutMs=45000,
   trustProxy=process.env.TRUST_PROXY||'',
   requireHttps=process.env.REQUIRE_HTTPS==='1'
 }={}){
   if(!Number.isFinite(battleCountdownMs)||battleCountdownMs<0)throw new Error('battleCountdownMs must be non-negative and finite');
+  if(!Number.isFinite(presenceTimeoutMs)||presenceTimeoutMs<=0)throw new Error('presenceTimeoutMs must be positive and finite');
   if(trustProxy&&trustProxy!=='loopback'&&!isIP(trustProxy))throw new Error('TRUST_PROXY must be loopback or an IP address');
   const trustedAddress=normalizeAddress(trustProxy),limits=authLimits();
   const profiles=new ProfileStore(dataFile);
-  const rooms=new Map(),sessions=new Map();
+  const rooms=new Map(),sessions=new Map(),presence=new Map();
   const json=(res,code,data,headers={})=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});res.end(JSON.stringify(data));};
+  function markPresent(accountToken,account){
+    presence.set(accountToken,{accountId:account.id,last:Date.now()});
+  }
+  function onlineCount(){
+    const now=Date.now(),accounts=new Set([...sessions.values()].map(session=>session.accountId));
+    for(const [token,entry] of presence){
+      if(now-entry.last>=presenceTimeoutMs)presence.delete(token);
+      else accounts.add(entry.accountId);
+    }
+    return accounts.size;
+  }
   function clearBattleCountdown(room){
     delete room.battleStartAt;
     delete room.world.countdown;
@@ -253,7 +266,7 @@ export function createArenaServer({
       if(requireHttps&&scheme!=='https'&&(viaProxy||!isLoopback(peer)||!localHost(req.headers.host))){
         return json(res,403,{error:'Для доступа к игре откройте адрес с HTTPS.'});
       }
-      if(req.method==='GET'&&url.pathname==='/api/online')return json(res,200,{online:sessions.size});
+      if(req.method==='GET'&&url.pathname==='/api/online')return json(res,200,{online:onlineCount()});
       if(req.method==='GET'&&url.pathname==='/api/health')return json(res,200,{ok:true,app:'sector04',rooms:rooms.size});
       if(req.method==='GET'&&url.pathname==='/api/rooms'){
         const now=performance.now();
@@ -280,17 +293,26 @@ export function createArenaServer({
           if(res.destroyed)return;
           if(!result)return json(res,503,{error:'Вход временно перегружен. Попробуйте ещё раз.'},{'Retry-After':1});
           const {account,accountToken}=result;
+          markPresent(accountToken,account);
           return json(res,200,{profile:profiles.view(account.id),accountToken});
         }
         const b=await body(req);
         if(url.pathname==='/api/logout'){
+          presence.delete(b.accountToken);
           if(profiles.logout(b.accountToken)){
             for(const [token,session] of sessions)if(session.accountToken===b.accountToken)remove(token);
           }
           return json(res,200,{ok:true});
         }
+        if(url.pathname==='/api/presence'){
+          const account=loggedAccount(b.accountToken);
+          markPresent(b.accountToken,account);
+          return json(res,200,{online:onlineCount()});
+        }
         if(url.pathname==='/api/profile'){
-          const account=profiles.authenticate(b.accountToken);return json(res,200,{profile:profiles.view(account.id)});
+          const account=profiles.authenticate(b.accountToken);
+          markPresent(b.accountToken,account);
+          return json(res,200,{profile:profiles.view(account.id)});
         }
         if(url.pathname==='/api/appearance'){
           const account=loggedAccount(b.accountToken);if(activeFor(account.id))throw new EconomyError('Сменить внешность можно между боями',409);
@@ -428,7 +450,11 @@ export function createArenaServer({
             angle:Number.isFinite(i.angle)?i.angle:0,weapon:Number.isInteger(i.weapon)?i.weapon:undefined};
           return json(res,200,{ok:true});
         }
-        if(url.pathname==='/api/leave'){remove(b.token);return json(res,200,{ok:true,profile:profiles.view(s.accountId)});}
+        if(url.pathname==='/api/leave'){
+          remove(b.token);
+          markPresent(s.accountToken,{id:s.accountId});
+          return json(res,200,{ok:true,profile:profiles.view(s.accountId)});
+        }
       }
       if(req.method==='GET'&&url.pathname==='/api/events'){
         // EventSource cannot set headers; use a short-lived, random session token.

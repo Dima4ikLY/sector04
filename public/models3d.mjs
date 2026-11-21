@@ -762,7 +762,7 @@ export function poseCharacterModel(model,p,time,weaponInfo,{turn=0,dt=1/60,skinE
   model.flash.visible=flash>.1;
   model.flash.scale.set(2+flash,model.flashLength,2+flash);
   for(const flame of model.flames){flame.visible=!!p.jetActive&&!p.dead;flame.scale.y=14+Math.sin(time*.07)*3;}
-  const opacity=pose.alpha*(p.buffs?.transparent>0?TRANSPARENT_OPACITY:1);
+  const opacity=pose.alpha*(p.buffs?.transparent>0?TRANSPARENT_OPACITY:1)*(p.coverOpacity??1);
   for(const material of model.materials){
     material.opacity=opacity;
     if(material.isMeshStandardMaterial)material.transparent=opacity<.999;

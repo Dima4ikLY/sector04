@@ -1,6 +1,7 @@
 import {hasLineOfSight} from './geometry.mjs';
 import {nearbyMechanism} from './map-interactives.mjs';
 import {teamRoutes} from './team-routes.mjs';
+import {isConcealedFrom} from './covers.mjs';
 
 const formations=new WeakMap();
 const plans=new WeakMap();
@@ -171,7 +172,7 @@ export function teamBotInput(player,world,dt,map,shotOriginHeight){
   for(const member of world.players){
     if(member===player||member.dead>0||member.hp<=0)continue;
     if(member.team===player.team)allies.push(member);
-    if(member.team===1-player.team)enemies.push(member);
+    if(member.team===1-player.team&&!isConcealedFrom(map,player,member))enemies.push(member);
   }
   const target=observe(player,allies,enemies,route,[...map.platforms,...(map.solids??[])],shotOriginHeight);
   const enemy=target?.enemy;
