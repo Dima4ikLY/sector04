@@ -37,7 +37,15 @@ const freeForAllAnchors={
   observatory:[
     ['small',255,760],['small',1240,760],['small',2115,760],['large',510,626],['large',1890,568],
     ['speed',891,584],['critical',1135,375],['armor',1055,488],['transparent',2335,617]
-  ]
+  ],
+  kiln:[
+    ['small',210,640],['small',2190,640],['large',960,470],['large',1440,470],
+    ['speed',630,560],['critical',1190,330],['armor',1780,560],['transparent',430,640]
+  ],
+  aqueduct:[
+    ['small',270,760],['small',2470,760],['large',680,480],['large',2100,480],
+    ['speed',1100,380],['critical',1360,560],['armor',1660,380],['transparent',320,590]
+  ],
 };
 
 // Team layouts have identical supplies on both flanks and contested items on the center line.
@@ -53,6 +61,30 @@ const teamAnchors={
   'rail-yard':{
     flank:[['small',220,760],['large',595,627],['speed',682,462],['transparent',880,568]],
     center:[['critical',370],['armor',529]]
+  },
+  'cooling-tower':{
+    flank:[['small',130,760],['large',350,520],['speed',560,430],['transparent',230,620]],
+    center:[['critical',760],['armor',340]]
+  },
+  'crane-way':{
+    flank:[['small',180,760],['large',410,570],['speed',650,480],['transparent',890,400]],
+    center:[['critical',420],['armor',760]]
+  },
+  'duel-terrace':{
+    flank:[['small',160,620],['large',380,520],['speed',600,430]],
+    center:[['critical',560]]
+  },
+  'duel-furnace':{
+    flank:[['small',130,640],['large',340,540],['armor',560,450]],
+    center:[['critical',520]]
+  },
+  'pump-house':{
+    flank:[['small',150,630],['large',360,540],['speed',570,450],['transparent',240,630]],
+    center:[['critical',720],['armor',300]]
+  },
+  'smelting-line':{
+    flank:[['small',170,650],['large',370,560],['speed',600,470],['transparent',840,390]],
+    center:[['critical',380],['armor',1140]]
   },
   floodgate:{
     flank:[['small',271,760],['large',515,553],['speed',661,646],['transparent',882,444]],

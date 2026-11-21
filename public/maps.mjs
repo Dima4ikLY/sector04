@@ -98,7 +98,52 @@ const freeForAllMaps=[
       {id:'observatory-lift',type:'lift',name:'Служебный лифт',x:1391,w:98,h:18,top:488,bottom:760,speed:126}
     ],
     spawns:[{x:90,y:760},{x:2370,y:760},{x:1350,y:283},{x:1150,y:488},{x:840,y:584},{x:2180,y:526}]
-  }
+  },
+  {
+    id:'kiln',name:'Обжиговый цех',number:'11',zone:'CERAMIC KILN WORKS',
+    width:2400,height:810,theme:'foundry',terrain:'Печи и каталки',
+    description:'Длинные печи с подъёмными площадками и два затвора в центре.',
+    platforms:[
+      {x:0,y:760,w:2400,h:50},
+      {x:180,y:640,w:240,h:24},{x:520,y:560,w:220,h:24},{x:860,y:470,w:240,h:24},
+      {x:1300,y:470,w:240,h:24},{x:1660,y:560,w:220,h:24},{x:1980,y:640,w:240,h:24},
+      {x:1080,y:330,w:240,h:26}
+    ],
+    solids:[
+      {x:700,y:620,w:120,h:140,kind:'machine'},
+      {x:1580,y:620,w:120,h:140,kind:'machine'},
+      {x:1120,y:560,w:36,h:200,kind:'wall'}
+    ],
+    mechanisms:[
+      {id:'kiln-west-gate',type:'door',name:'Западный затвор печи',x:640,y:600,w:28,h:160,initiallyOpen:true},
+      {id:'kiln-east-gate',type:'door',name:'Восточный затвор печи',x:1732,y:600,w:28,h:160,initiallyOpen:true},
+      {id:'kiln-lift',type:'lift',name:'Подъёмник к лотку',x:1190,w:70,h:18,top:560,bottom:760,speed:130}
+    ],
+    spawns:[{x:120,y:760},{x:2280,y:760},{x:1080,y:470},{x:640,y:560},{x:1760,y:560},{x:1200,y:330}]
+  },
+  {
+    id:'aqueduct',name:'Акведук',number:'12',zone:'OLD AQUEDUCT',
+    width:2760,height:810,theme:'canyon',terrain:'Арки и жёлоба',
+    description:'Верхний жёлоб соединяет арки, внизу два коротких тоннеля с затворами.',
+    platforms:[
+      {x:0,y:760,w:2760,h:50},
+      {x:240,y:590,w:200,h:24},{x:560,y:480,w:220,h:24},{x:980,y:380,w:240,h:24},
+      {x:1540,y:380,w:240,h:24},{x:1980,y:480,w:220,h:24},{x:2320,y:590,w:200,h:24},
+      {x:1240,y:560,w:280,h:24}
+    ],
+    solids:[
+      {x:420,y:680,w:90,h:80,kind:'wall'},
+      {x:1140,y:640,w:80,h:120,kind:'machine'},
+      {x:1540,y:640,w:80,h:120,kind:'machine'},
+      {x:2250,y:680,w:90,h:80,kind:'wall'}
+    ],
+    mechanisms:[
+      {id:'aqueduct-west-shutter',type:'door',name:'Западная створка',x:530,y:660,w:28,h:100,initiallyOpen:true},
+      {id:'aqueduct-east-shutter',type:'door',name:'Восточная створка',x:2200,y:660,w:28,h:100,initiallyOpen:true},
+      {id:'aqueduct-lift',type:'lift',name:'Подъёмник на жёлоб',x:1360,w:64,h:18,top:560,bottom:760,speed:124}
+    ],
+    spawns:[{x:110,y:760},{x:2650,y:760},{x:1100,y:380},{x:1660,y:380},{x:660,y:480},{x:2080,y:480}]
+  },
 ];
 
 function teamArena({westPlatforms,westSolids,westSpawns,centerPlatforms=[],centerSolids=[],...map}){
@@ -220,12 +265,144 @@ const teamMaps=[
       {id:'floodgate-tunnel-gate',type:'door',name:'Затвор тоннеля',x:1395,y:581,w:30,h:179,initiallyOpen:true}
     ],
     westSpawns:[{x:135,y:760},{x:267,y:650},{x:461,y:553}]
+  }),
+  teamArena({
+    id:'cooling-tower',name:'Градирня',number:'13',zone:'COOLING TOWER',
+    mode:'2v2',width:1560,theme:'spillway',zoom:1.2,terrain:'Кольцевые мостки',
+    description:'Два коротких кольцевых маршрута вокруг градирни и центральный лифт.',
+    westPlatforms:[
+      {x:96,y:620,w:190,h:24,kind:'deck'},
+      {x:328,y:520,w:160,h:24,kind:'deck'},
+      {x:530,y:430,w:170,h:24,kind:'deck'}
+    ],
+    centerPlatforms:[{x:660,y:340,w:240,h:26,kind:'deck'}],
+    westSolids:[
+      {x:220,y:690,w:80,h:70,kind:'machine'},
+      {x:292,y:590,w:30,h:70,kind:'wall'}
+    ],
+    mechanisms:[
+      {id:'cooling-west-lift',type:'lift',name:'Западный лифт',x:540,w:60,h:18,top:520,bottom:760,speed:132},
+      {id:'cooling-east-lift',type:'lift',name:'Восточный лифт',x:960,w:60,h:18,top:520,bottom:760,speed:132}
+    ],
+    westSpawns:[{x:120,y:760},{x:150,y:620}]
+  }),
+  teamArena({
+    id:'crane-way',name:'Крановый путь',number:'14',zone:'CRANE WAY',
+    mode:'3v3',width:2640,theme:'foundry',zoom:1.16,terrain:'Кран-балка и путь',
+    description:'Три яруса: путь, мостки и нижний проезд с затворами.',
+    westPlatforms:[
+      {x:140,y:660,w:170,h:24,kind:'deck'},
+      {x:360,y:570,w:190,h:24,kind:'deck'},
+      {x:600,y:480,w:210,h:24,kind:'deck'},
+      {x:860,y:400,w:230,h:24,kind:'deck'},
+      {x:1140,y:500,w:180,h:24,kind:'deck'}
+    ],
+    centerPlatforms:[
+      {x:1320,y:360,w:280,h:26,kind:'deck'},
+      {x:1180,y:640,w:220,h:24,kind:'deck'}
+    ],
+    westSolids:[
+      {x:260,y:700,w:90,h:60,kind:'machine'},
+      {x:420,y:620,w:30,h:80,kind:'wall'},
+      {x:760,y:690,w:100,h:70,kind:'building'}
+    ],
+    centerSolids:[{x:1420,y:690,w:110,h:70,kind:'machine'}],
+    mechanisms:[
+      {id:'crane-way-west-gate',type:'door',name:'Западный затвор',x:1060,y:620,w:28,h:140,initiallyOpen:true},
+      {id:'crane-way-east-gate',type:'door',name:'Восточный затвор',x:1560,y:620,w:28,h:140,initiallyOpen:true},
+      {id:'crane-way-lift',type:'lift',name:'Подъёмник на мостки',x:1290,w:80,h:18,top:560,bottom:760,speed:138}
+    ],
+    westSpawns:[{x:150,y:760},{x:220,y:660},{x:420,y:570}]
+  }),
+  teamArena({
+    id:'duel-terrace',name:'Терраса',number:'15',zone:'DUEL TERRACE',
+    mode:'1v1',width:1200,theme:'observatory',zoom:1.35,terrain:'Террасы и лифт',
+    description:'Компактная дуэльная арена с лифтом и короткими флангами.',
+    westPlatforms:[
+      {x:120,y:620,w:160,h:24,kind:'deck'},
+      {x:340,y:520,w:180,h:24,kind:'deck'},
+      {x:560,y:430,w:200,h:24,kind:'deck'}
+    ],
+    centerPlatforms:[{x:480,y:330,w:240,h:26,kind:'deck'}],
+    westSolids:[
+      {x:200,y:690,w:70,h:70,kind:'machine'},
+      {x:260,y:600,w:26,h:60,kind:'wall'}
+    ],
+    mechanisms:[
+      {id:'duel-terrace-lift',type:'lift',name:'Дуэльный лифт',x:300,w:56,h:18,top:520,bottom:760,speed:140}
+    ],
+    westSpawns:[{x:96,y:760},{x:160,y:620}]
+  }),
+  teamArena({
+    id:'duel-furnace',name:'Горн',number:'16',zone:'FURNACE DUEL PIT',
+    mode:'1v1',width:1080,theme:'foundry',zoom:1.4,terrain:'Котёл и желоба',
+    description:'Маленькая арена-горн: два яруса и один затвор в центре.',
+    westPlatforms:[
+      {x:100,y:640,w:150,h:24,kind:'deck'},
+      {x:300,y:540,w:170,h:24,kind:'deck'},
+      {x:520,y:450,w:180,h:24,kind:'deck'}
+    ],
+    centerPlatforms:[{x:420,y:350,w:240,h:26,kind:'deck'}],
+    westSolids:[
+      {x:180,y:700,w:80,h:60,kind:'machine'}
+    ],
+    centerSolids:[{x:520,y:680,w:60,h:80,kind:'machine'}],
+    mechanisms:[
+      {id:'duel-furnace-gate',type:'door',name:'Затвор горна',x:540,y:640,w:28,h:120,initiallyOpen:true}
+    ],
+    westSpawns:[{x:80,y:760},{x:140,y:640}]
+  }),
+  teamArena({
+    id:'pump-house',name:'Насосная станция',number:'17',zone:'PUMP HOUSE',
+    mode:'2v2',width:1480,theme:'harbor',zoom:1.25,terrain:'Насосы и эстакада',
+    description:'Два фланга с насосами и центральная эстакада с затвором.',
+    westPlatforms:[
+      {x:110,y:630,w:180,h:24,kind:'deck'},
+      {x:330,y:540,w:170,h:24,kind:'deck'},
+      {x:540,y:450,w:180,h:24,kind:'deck'}
+    ],
+    centerPlatforms:[{x:620,y:360,w:240,h:26,kind:'deck'}],
+    westSolids:[
+      {x:210,y:690,w:90,h:70,kind:'machine'},
+      {x:290,y:600,w:28,h:64,kind:'wall'}
+    ],
+    centerSolids:[{x:700,y:680,w:80,h:80,kind:'machine'}],
+    mechanisms:[
+      {id:'pump-house-gate',type:'door',name:'Затвор эстакады',x:640,y:560,w:28,h:200,initiallyOpen:true},
+      {id:'pump-house-lift',type:'lift',name:'Лифт насосной',x:250,w:60,h:18,top:530,bottom:760,speed:130}
+    ],
+    westSpawns:[{x:90,y:760},{x:150,y:630}]
+  }),
+  teamArena({
+    id:'smelting-line',name:'Плавильная линия',number:'18',zone:'SMELTING LINE',
+    mode:'3v3',width:2520,theme:'dungeon',zoom:1.2,terrain:'Плавильные желоба',
+    description:'Три линии желобов с затворами и центральный мост.',
+    westPlatforms:[
+      {x:130,y:650,w:160,h:24,kind:'deck'},
+      {x:340,y:560,w:180,h:24,kind:'deck'},
+      {x:570,y:470,w:190,h:24,kind:'deck'},
+      {x:810,y:390,w:200,h:24,kind:'deck'}
+    ],
+    centerPlatforms:[
+      {x:1010,y:350,w:300,h:26,kind:'deck'},
+      {x:1060,y:630,w:200,h:24,kind:'deck'}
+    ],
+    westSolids:[
+      {x:250,y:690,w:90,h:70,kind:'machine'},
+      {x:430,y:610,w:30,h:80,kind:'wall'}
+    ],
+    centerSolids:[{x:1150,y:690,w:100,h:70,kind:'machine'}],
+    mechanisms:[
+      {id:'smelting-west-gate',type:'door',name:'Западный желоб',x:960,y:600,w:28,h:160,initiallyOpen:true},
+      {id:'smelting-east-gate',type:'door',name:'Восточный желоб',x:1560,y:600,w:28,h:160,initiallyOpen:true}
+    ],
+    westSpawns:[{x:140,y:760},{x:210,y:650},{x:390,y:560}]
   })
 ];
 
 export const maps=[...freeForAllMaps,...teamMaps];
 export const getMap=id=>maps.find(map=>map.id===id)||maps[0];
 export function getMapsForMode(mode='ffa'){
-  const pool=mode==='1v1'?'2v2':mode;
+  const pool=mode;
   return maps.filter(map=>(map.mode??'ffa')===pool);
 }

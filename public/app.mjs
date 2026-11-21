@@ -211,7 +211,7 @@ function createTeamThumbnail(map){
 function createMapPreview(map){
   if(!map.teamSpawns){
     const image=new Image(480,200);
-    image.src=`/art/maps/${map.id}.webp`;image.alt='';image.decoding='async';
+    image.src=`/art/maps/${map.id}.webp`;image.alt='';image.decoding='async';image.onerror=()=>{image.replaceWith(createTeamThumbnail(map));};
     return image;
   }
   const cached=mapButtons.get(map.id)?.querySelector('.map-thumbnail canvas');
