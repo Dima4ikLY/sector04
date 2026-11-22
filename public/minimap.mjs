@@ -7,7 +7,7 @@ function fitName(ctx,name,width){
   return '';
 }
 
-export function drawMinimap(ctx,{map,physicalMap,players=[],viewX,viewY,viewWidth,viewHeight,focus,width,height,unit=1,pixel=unit,touch=null,coop=false}){
+export function drawMinimap(ctx,{map,physicalMap,players=[],viewX,viewY,viewWidth,viewHeight,focus,width,height,unit=1,pixel=unit,touch=null,coop=false,markers=[]}){
   if(map.width<=viewWidth&&map.height<=viewHeight)return;
   const devicePixel=pixel/unit;
   const snap=value=>Math.round(value/devicePixel)*devicePixel;
@@ -80,6 +80,12 @@ export function drawMinimap(ctx,{map,physicalMap,players=[],viewX,viewY,viewWidt
     ctx.fillStyle='#0c1522';ctx.fill();
     ctx.strokeStyle=color;ctx.lineWidth=1;ctx.stroke();
     ctx.fillStyle=color;ctx.fillText(portal.pair??'·',x,y);
+  }
+  for(const {x,y,color} of markers){
+    const px=snap(fieldX+x*scaleX),py=snap(fieldY+y*scaleY);
+    ctx.beginPath();ctx.moveTo(px,py-3.5);ctx.lineTo(px+3.5,py);ctx.lineTo(px,py+3.5);
+    ctx.lineTo(px-3.5,py);ctx.closePath();
+    ctx.fillStyle=color??'#ffdc8a';ctx.fill();ctx.strokeStyle='#071019';ctx.lineWidth=1;ctx.stroke();
   }
   for(const p of players){
     if(!p||p.dead>0||p.id===focus?.id)continue;

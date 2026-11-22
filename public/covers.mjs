@@ -83,6 +83,7 @@ function groundedCovers(map){
 }
 
 export function getMapCovers(map){
+  if(map.covers)return map.covers;
   // Mechanism snapshots copy the map every tick, but keep static slabs shared.
   const key=map.platforms?.find(surface=>!surface.mechanismId)??map;
   let entry=cache.get(key);
@@ -90,12 +91,12 @@ export function getMapCovers(map){
   return entry.covers;
 }
 
-export function coverAt(map,x,y){
-  return getMapCovers(map).find(cover=>x>=cover.x&&x<=cover.x+cover.w&&y>=cover.y-cover.h&&y<=cover.y)??null;
+export function coverAt(map,x,y,isActive){
+  return getMapCovers(map).find(cover=>x>=cover.x&&x<=cover.x+cover.w&&y>=cover.y-cover.h&&y<=cover.y&&(!isActive||isActive(cover)))??null;
 }
 
-export function isConcealedFrom(map,viewer,target){
+export function isConcealedFrom(map,viewer,target,isActive){
   if(!target||target.dead>0||target.hp<=0)return false;
-  const cover=coverAt(map,target.x,target.y);
-  return !!cover&&(!viewer||coverAt(map,viewer.x,viewer.y)!==cover);
+  const cover=coverAt(map,target.x,target.y,isActive);
+  return !!cover&&(!viewer||coverAt(map,viewer.x,viewer.y,isActive)!==cover);
 }

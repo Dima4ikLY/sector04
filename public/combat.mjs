@@ -1,8 +1,13 @@
-export function rankPlayers(players){return [...players].sort((a,b)=>b.kills-a.kills||a.deaths-b.deaths);}
+export function rankPlayers(players){return [...players].sort((a,b)=>(b.objectiveScore??0)-(a.objectiveScore??0)||b.kills-a.kills||a.deaths-b.deaths);}
 export function matchSummary(world,id){
   const sorted=rankPlayers(world.results||world.players),p=sorted.find(p=>p.id===id),reward=world.rewards||{};
   const summary={place:p?sorted.indexOf(p)+1:0,total:sorted.length,kills:p?.kills||0,deaths:p?.deaths||0,damage:Math.round(p?.damageDealt||0),rating:reward.rating||0,coins:reward.coins||0,rankBonus:reward.rankBonus||0,winner:sorted[0]?.name||'—',won:sorted[0]?.id===id};
-  if(!world.teams)return summary;
+  if(!world.teams){
+    if(!world.objectiveResult)return summary;
+    const winner=world.objectiveResult.playerId;
+    return {...summary,winner:sorted.find(player=>player.id===winner)?.name||'—',
+      won:winner===id,draw:winner===null};
+  }
   const {winner,scores}=world.teams,team=p?.team??null;
   const won=winner!==null&&team===winner;
   if(world.match?.mode==='1v1'&&winner!==null){

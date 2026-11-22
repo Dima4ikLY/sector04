@@ -5,9 +5,9 @@ import {START_WEAPON,armorForEquipment,helmetForEquipment,ranks,rankIndex,rankUn
 import {getMap,getMapsForMode} from './maps.mjs';
 import {AimCamera,sampleBlastShake} from './camera.mjs';
 import {buildScenery,drawMapMechanisms,drawMapCovers,drawRiftAtmosphere,drawTidalBridge,drawTidalWater} from './scenery.mjs';
-import {isConcealedFrom} from './covers.mjs';
 import {teamSpawnColors as teamColors,teamFightColors} from './map-detail.mjs';
-import {mapWithMechanisms,nearbyMechanism} from './map-interactives.mjs';
+import {nearbyMechanism} from './map-interactives.mjs';
+import {getMapObjective,isArenaConcealed,physicalArena} from './map-objectives.mjs';
 import {WeaponAudio} from './audio.mjs';
 import {BattleScore} from './battle-score.mjs';
 import {drawCharacter,drawCharacterLabel,characterStyles,characterPalettes} from './characters.mjs';
@@ -159,6 +159,12 @@ function syncRoomCreateMaps(){
   const modeSelect=document.getElementById('roomCreateMode'),mapSelect=document.getElementById('roomCreateMap');
   if(!modeSelect||!mapSelect)return;
   mapSelect.replaceChildren(...getMapsForMode(modeSelect.value).map(map=>new Option(map.name,map.id)));
+  syncRoomCreateObjective();
+}
+function syncRoomCreateObjective(){
+  const map=getMap($('roomCreateMap').value);
+  $('roomCreateFrags').disabled=!!map.objective;
+  $('roomCreateFrags').parentElement.hidden=!!map.objective;
 }
 function openFriendsCreate(){
   const menu=document.querySelector('.friends-menu');
@@ -180,12 +186,13 @@ function initRoomCreateForm(){
     wrap.append(input,span);weaponsBox.append(wrap);
   });
   syncRoomCreateMaps();
-  document.getElementById('roomCreateMode').addEventListener('change',syncRoomCreateMaps);
+  $('roomCreateMode').addEventListener('change',syncRoomCreateMaps);
+  $('roomCreateMap').addEventListener('change',syncRoomCreateObjective);
   document.getElementById('roomCreateCancel').addEventListener('click',()=>{form.hidden=true;document.getElementById('friendsHomeActions')?.removeAttribute('hidden');});
   form.addEventListener('submit',event=>{
     event.preventDefault();
     const selected=[...weaponsBox.querySelectorAll('input:checked')].map(input=>Number(input.value));
-    const options={frags:Number(document.getElementById('roomCreateFrags').value),timeMinutes:Number(document.getElementById('roomCreateTime').value),weapons:selected.length?selected:[...weapons.keys()],botDifficulty:document.getElementById('roomCreateDiff').value};
+    const options={...(!$('roomCreateFrags').disabled?{frags:Number($('roomCreateFrags').value)}:{}),timeMinutes:Number(document.getElementById('roomCreateTime').value),weapons:selected.length?selected:[...weapons.keys()],botDifficulty:document.getElementById('roomCreateDiff').value};
     join('create',document.getElementById('roomCreateMode').value,document.getElementById('roomCreateMap').value,options);
   });
 }
@@ -240,9 +247,11 @@ function syncMapChoices(mapId){
   $('duelPrivate').disabled=locked;
   $('incomingInvite').hidden=!!session||!incomingCode;
   $('incomingJoin').disabled=locked;
-  $('queueSelection').textContent=`${getMap(lobbyMap(selectedMatchMode)).name} · ${selectedMatchMode==='ffa'?'Каждый за себя':matchNames[selectedMatchMode]}`;
-  $('queueHint').textContent=selectedMatchMode==='1v1'?'Матч начнётся, когда подключится соперник. Ботов нет.':
-    'До 10 секунд на подбор. Свободные места займут боты.';
+  const choice=getMap(lobbyMap(selectedMatchMode));
+  const format=selectedMatchMode==='ffa'?'Каждый за себя':matchNames[selectedMatchMode];
+  $('queueSelection').textContent=`${choice.name} · ${choice.objectiveLabel??format}`;
+  $('queueHint').textContent=choice.rules??(selectedMatchMode==='1v1'?'Матч начнётся, когда подключится соперник. Ботов нет.':
+    'До 10 секунд на подбор. Свободные места займут боты.');
   $('mapPracticeHint').hidden=selectedMatchMode==='ffa';
   $('mapPracticeHint').textContent=`Тренировка, экспедиция и стрельбище используют карту «${getMap(practiceMap()).name}».`;
 }
@@ -257,6 +266,7 @@ function syncMapLabels(mapId){
   const interactions=new Set(map.mechanisms?.map(mechanism=>mechanism.type));
   const interactionLabels=[['door','дверь'],['lift','лифт'],['portal','портал']]
     .filter(([type])=>interactions.has(type)).map(([,label])=>label);
+  if(map.objective&&!session?.range&&!session?.coop)interactionLabels.push('цель карты');
   interactionHelp.hidden=!interactionLabels.length;
   interactionHelp.lastChild.textContent=` ${interactionLabels.join(' / ')}`;
   const mode=session?.coop?'ЭКСПЕДИЦИЯ':session?.range?'СТРЕЛЬБИЩЕ':session?.training?'ТРЕНИРОВКА':session?'ОНЛАЙН':'ПОЛИГОН';
@@ -265,8 +275,8 @@ function syncMapLabels(mapId){
   const matchMode=currentMatchMode(),capacity=match?.capacity??matchCapacities[matchMode];
   $('arenaCapacity').textContent=match||!session?`${capacity} ${capacity===6?'игроков':'игрока'}`:
     session?.coop?'1–3 игрока':session?.range?'1 игрок':'До 6 игроков';
-  $('arenaRules').textContent=matchMode!=='ffa'?matchNames[matchMode]:
-    session?.coop?'3 волны':session?.range?'3 мишени':'Каждый за себя';
+  $('arenaRules').textContent=(session?.coop?'3 волны':session?.range?'3 мишени':map.objectiveLabel)??
+    (matchMode!=='ffa'?matchNames[matchMode]:'Каждый за себя');
   $('scoreHelp').hidden=!!(session?.coop||session?.range);
   $('cameraHint').textContent=session?'Арена текущей сессии':'Арена для следующего боя';
   syncMapChoices(mapId);
@@ -292,18 +302,28 @@ function selectMap(id){
 function createTeamThumbnail(map){
   const preview=document.createElement('canvas');
   preview.width=480;preview.height=200;preview.setAttribute('aria-hidden','true');
-  const scene=buildScenery(map),context=preview.getContext('2d');
-  const top=Math.max(0,Math.min(scene.height-scene.width*preview.height/preview.width,scene.height*.18));
-  context.drawImage(scene,0,top,scene.width,scene.height-top,0,0,preview.width,preview.height);
+  const context=preview.getContext('2d');
+  const draw=(backdrop=null)=>{
+    const scene=buildScenery(map,{backdrop,preview:true});
+    const height=Math.min(scene.height,scene.width*preview.height/preview.width);
+    context.drawImage(scene,0,(scene.height-height)/2,scene.width,height,0,0,preview.width,preview.height);
+  };
+  draw();
+  if(map.missionArt&&map.backdrop){
+    const image=new Image();
+    image.onload=()=>draw(image);
+    image.src='/art/backgrounds/'+map.backdrop.file;
+  }
   return preview;
 }
 function createMapPreview(map){
+  if(map.missionArt)return createTeamThumbnail(map);
   if(map.tidal||map.backdrop?.aligned){
     const image=new Image(480,240);
     image.src=`/art/backgrounds/${map.backdrop.file}`;
     image.alt='';
     image.decoding='async';
-    if(map.tidal)image.onerror=()=>image.replaceWith(buildScenery(map,{preview:true}));
+    if(map.tidal||map.objective)image.onerror=()=>image.replaceWith(createTeamThumbnail(map));
     return image;
   }
   if(!map.teamSpawns){
@@ -326,7 +346,7 @@ function createMapChoice(map){
 
   const copy=document.createElement('span');copy.className='map-choice-copy';
   const title=document.createElement('strong');title.textContent=map.name;
-  const terrain=document.createElement('small');terrain.textContent=map.teamSpawns?map.description:map.terrain;terrain.id=`mapTerrain-${map.id}`;
+  const terrain=document.createElement('small');terrain.textContent=map.objectiveLabel??(map.teamSpawns?map.description:map.terrain);terrain.id=`mapTerrain-${map.id}`;
   if(map.teamSpawns)terrain.className='map-choice-description';
   copy.append(title,terrain);
   button.setAttribute('aria-label',map.name);
@@ -427,7 +447,7 @@ function prepareBattleIntro(mapId,mode){
   battleIntroEntry={mapId,mode,shown:false,cueState:null};
   $('battleIntroTitle').textContent=map.name;
   $('battleIntroMode').textContent=battleModeNames[mode];
-  $('battleIntroTip').textContent=pickBattleTip({mode,touch,bindings:preferences.bindings});
+  $('battleIntroTip').textContent=(mode!=='coop'&&mode!=='range'?map.rules:undefined)??pickBattleTip({mode,touch,bindings:preferences.bindings});
   $('battleIntroArt').replaceChildren(createMapPreview(map));
 }
 function placeBattleIntro(){
@@ -607,8 +627,8 @@ function syncMatchQueue(initial=false){
     $('leave').textContent=queued?$('queueCancel').textContent:'Выйти из боя';
     $('sessionTitle').textContent=queued&&!duel?'Поиск игроков':matchNames[match.mode];
     $('sessionDescription').textContent=world.countdown?'Бой начнётся по окончании отсчёта.':queued?(duel?'Бой начнётся, когда подключится второй игрок.':'Свободные места займут боты, когда истечёт время поиска.'):
-      duel||match.mode==='ffa'?`${duel?'Дуэль без ботов.':'Каждый за себя.'} Побеждает первый до ${TARGET} фрагов или лидер по истечении времени.`:
-        `Фраги идут в общий счёт. Побеждает команда, первой набравшая ${TARGET} фрагов, или лидер по истечении времени.`;
+      getMap(world.mapId).rules??(duel||match.mode==='ffa'?`${duel?'Дуэль без ботов.':'Каждый за себя.'} Побеждает первый до ${TARGET} фрагов или лидер по истечении времени.`:
+        `Фраги идут в общий счёт. Побеждает команда, первой набравшая ${TARGET} фрагов, или лидер по истечении времени.`);
     if(queued)setQueueHeading(match.mode,world.mapId);
     else if(returnFocus)canvas.focus({preventScroll:true});
   }
@@ -655,7 +675,7 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
       selectedMatchMode=next.match.mode;
       mapSelections.set(selectedMatchMode,next.mapId);
     }
-    session=next;selectedMap=next.mapId;motion.reset();visualActors.clear();arenaSkinEffects.reset();camera.reset();audio.reset();feedback.reset();stalled=false;progressWarning=false;world=createWorld(next.mapId);bg=scenery(getMap(next.mapId));syncMapLabels(next.mapId);canvas.style.cursor='none';lastState=performance.now();$('profileName').firstChild.textContent=name;roomBrowser.setPlaying(true);
+    session=next;selectedMap=next.mapId;motion.reset();visualActors.clear();arenaSkinEffects.reset();camera.reset();audio.reset();feedback.reset();stalled=false;progressWarning=false;world=createWorld(next.mapId,{range:next.range,coop:next.coop,teamSize:next.match?.mode==='ffa'||!next.match?0:matchCapacities[next.match.mode]/2});bg=scenery(getMap(next.mapId));syncMapLabels(next.mapId);canvas.style.cursor='none';lastState=performance.now();$('profileName').firstChild.textContent=name;roomBrowser.setPlaying(true);
     const battleMode=next.match?.mode??(next.coop?'coop':next.range?'range':next.training?'train':'ffa');
     prepareBattleIntro(next.mapId,battleMode);
     if(next.match)world.match=next.match;
@@ -688,7 +708,7 @@ async function join(mode,matchMode=mode==='quick'?selectedMatchMode:undefined,ma
     $('invite').hidden=next.training||next.range;
     $('roomLabel').textContent=next.match&&next.match.mode!=='ffa'?matchNames[next.match.mode].toUpperCase():
       next.coop?'ЭКСПЕДИЦИЯ':next.range?'СТРЕЛЬБИЩЕ':next.training?'ТРЕНИРОВКА':`КОМНАТА ${next.room}`;
-    $('matchGoal').textContent=next.coop?'СБОР ОТРЯДА':next.range?'СВОБОДНАЯ СТРЕЛЬБА':`ЦЕЛЬ ${TARGET}`;
+    $('matchGoal').textContent=world.objective?getMap(next.mapId).objectiveLabel:next.coop?'СБОР ОТРЯДА':next.range?'СВОБОДНАЯ СТРЕЛЬБА':`ЦЕЛЬ ${TARGET}`;
     $('leave').textContent=next.range?'Вернуться в лобби':'Выйти из боя';
     $('weaponNext').hidden=next.weaponSlots.length<2;
     syncMatchQueue(true);
@@ -1051,9 +1071,9 @@ function combatAim(p,left,right){
   if(!usesTouchAim())return pointerAimAngle(p,map);
   const zoom=arenaZoom(map),viewY=arenaViewY(map,p,zoom),margin=22;
   const origin={x:p.x,y:p.y-shotOriginHeight(p.stance)};
-  const physicalMap=mapWithMechanisms(map,world.mechanisms,world.bridgeHealth);
+  const physicalMap=physicalArena(map,world.mechanisms,world.bridgeHealth,world.objective);
   const points=world.players.filter(player=>player!==p&&player.dead<=0&&(!session?.coop||player.coopEnemy)
-    &&(!world.teams||player.team!==p.team)&&!isConcealedFrom(map,p,player)
+    &&(!world.teams||player.team!==p.team)&&!isArenaConcealed(map,world.objective,p,player)
     &&player.x>=camera.x-margin&&player.x<=camera.x+W/zoom+margin
     &&player.y>=viewY-margin&&player.y<=viewY+H/zoom+margin)
     .map(player=>({x:player.x,y:player.y-shotOriginHeight(player.stance)}));
@@ -1092,15 +1112,28 @@ function playerScoreRow(player,index,viewerId){
   const row=document.createElement('div');
   row.className=`score-row${player.id===viewerId?' me':''}`;
   if(player.team!==undefined)row.dataset.team=player.team;
-  for(const text of [String(index+1).padStart(2,'0'),`${player.name}${player.bot?' [БОТ]':''}`,String(player.kills),`/ ${player.deaths}`]){
+  for(const text of [String(index+1).padStart(2,'0'),`${player.name}${player.bot?' [БОТ]':''}`,(player.objectiveScore===undefined?'':player.objectiveScore+' ◇ ')+player.kills,`/ ${player.deaths}`]){
     const cell=document.createElement('span');
     cell.textContent=text;
     row.append(cell);
   }
   return row;
 }
+function scoreboardPlayers(){
+  const players=world.results||world.players;
+  const state=world.objective,objective=state&&getMapObjective(getMap(world.mapId));
+  return rankPlayers(!world.results&&objective?.score
+    ? players.map(player=>({...player,objectiveScore:objective.score(state,player)}))
+    : players);
+}
+function teamScoreLabel(team){
+  const score=world.objective?world.objective.scores?.[team]:world.teams.scores[team];
+  return score===undefined?teamNames[team]:teamNames[team]+' · '+score;
+}
 function updateScoreboard(me){
-  const sorted=rankPlayers(world.results||world.players);
+  const sorted=scoreboardPlayers();
+  const objective=world.objective&&getMapObjective(getMap(world.mapId));
+  if(objective)$('matchGoal').textContent=objective.hud(getMap(world.mapId),world.objective,me);
   const duel=world.match?.mode==='1v1';
   $('scoreTitle').textContent=`ТАБЛИЦА БОЯ · ${duel?sorted.length:world.players.length}/${world.match?.capacity??6}`;
   if(!world.teams||duel){
@@ -1108,12 +1141,12 @@ function updateScoreboard(me){
     $('scoreContent').replaceChildren(...sorted.map((player,index)=>playerScoreRow(player,index,me.id)));
     return;
   }
-  $('matchGoal').textContent=teamScoreText(world.teams.scores);
-  const rows=teamNames.flatMap((name,team)=>{
+  if(!objective)$('matchGoal').textContent=teamScoreText(world.teams.scores);
+  const rows=teamNames.flatMap((_,team)=>{
     const heading=document.createElement('div');
     heading.className='score-team-heading';
     heading.dataset.team=team;
-    heading.textContent=`${name} · ${world.teams.scores[team]}${team===me.team?' · ТВОЯ КОМАНДА':''}`;
+    heading.textContent=teamScoreLabel(team)+(team===me.team?' · ТВОЯ КОМАНДА':'');
     return [heading,...sorted.filter(player=>player.team===team).map((player,index)=>playerScoreRow(player,index,me.id))];
   });
   $('scoreContent').replaceChildren(...rows);
@@ -1344,6 +1377,8 @@ function showResults(me){
   $('resultOverline').textContent=coop?'ИТОГИ ЭКСПЕДИЦИИ':range?'ЗАНЯТИЕ ЗАВЕРШЕНО':'МАТЧ ЗАВЕРШЁН';
   $('resultTitle').textContent=coop?(won?'Отряд справился!':'Время вышло.'):range?'Стрельбище':summary.won?'Победа твоя.':'До встречи на арене.';
   $('resultText').textContent=coop?(won?'Пройдены все три волны.':'Отряд может попробовать ещё раз.'):range?'Итоги занятия':`Лидер: ${summary.winner}. Место: ${summary.place} из ${summary.total}.`;
+  const objective=world.objective&&getMapObjective(getMap(world.mapId));
+  if(objective&&summary.draw)$('resultTitle').textContent='Ничья.';
   if(world.teams){
     const {winner,scores}=world.teams;
     $('resultOverline').textContent=matchNames[world.match.mode].toUpperCase();
@@ -1352,8 +1387,14 @@ function showResults(me){
       $('resultText').textContent=world.match.reason==='forfeit'?'Соперник покинул дуэль.':duelScoreText(scores,me.team);
     }else{
       $('resultTitle').textContent=winner===null?'Ничья.':winner===me.team?'Твоя команда победила.':`${teamNames[winner]} победили.`;
-      $('resultText').textContent=teamScoreText(scores);
+      $('resultText').textContent=objective
+        ? world.objective.scores?teamScoreText(world.objective.scores):objective.hud(getMap(world.mapId),world.objective,me)
+        : teamScoreText(scores);
     }
+  }
+  if(objective?.score&&!world.teams){
+    const placed=world.results.find(player=>player.id===me.id);
+    $('resultText').textContent=(summary.draw?'Одинаковый результат. ':'Лидер · '+summary.winner+'. ')+'Образцы · '+(placed?.objectiveScore??0)+'/3';
   }
   $('resultKillsLabel').textContent=coop?'Волны команды':range?'Мишени':'Убийства';
   $('resultKills').textContent=coop?(won?mission.totalWaves:Math.max(0,mission.wave-Number(mission.enemiesLeft>0))):summary.kills;
@@ -1512,7 +1553,16 @@ function renderPlayers(players,dt,angle,map){
   });
 }
 function updateInteractionPrompt(map){
-  const me=map.mechanisms?.length&&canControl()?world.players.find(player=>player.id===session.id):null;
+  const me=(map.mechanisms?.length||world.objective)&&canControl()?world.players.find(player=>player.id===session.id):null;
+  const objective=world.objective&&getMapObjective(map);
+  const target=me&&me.dead<=0&&objective?.nearby?.(map,world.objective,me);
+  if(target){
+    interactionButton.hidden=false;
+    interactionButton.disabled=!!target.disabled;
+    interactionKey.hidden=touch||!!target.disabled;
+    if(interactionText.textContent!==target.label)interactionText.textContent=target.label;
+    return;
+  }
   const nearby=me&&nearbyMechanism(map,world.mechanisms,me);
   interactionButton.hidden=!nearby;
   if(!nearby)return;
@@ -1541,18 +1591,19 @@ function drawScoreboard(){
   rect(hud,420,150,600,430,'#101a12ee');
   hud.font='22px Consolas,monospace';hud.fillStyle='#dbebc5';hud.textAlign='left';
   hud.fillText('БОЕЦ                      K / D',460,205);
-  const ranked=rankPlayers(world.results||world.players);
+  const ranked=scoreboardPlayers();
   let y=260;
   const groups=world.teams?teamNames.map((_,team)=>ranked.filter(player=>player.team===team)):[ranked];
   groups.forEach((players,team)=>{
     if(world.teams){
       hud.fillStyle=teamFightColors[team];
-      hud.fillText(`${teamNames[team]} · ${world.teams.scores[team]}`,460,y);
+      hud.fillText(teamScoreLabel(team),460,y);
       y+=35;
     }
     for(const player of players){
       hud.fillStyle=player.id===session.id?'#c7f36b':'#a8b99a';
       hud.fillText(`${player.name}${player.bot?' [БОТ]':''}`,460,y);
+      if(player.objectiveScore!==undefined)hud.fillText(player.objectiveScore+' ◇',760,y);
       hud.fillText(`${player.kills} / ${player.deaths}`,860,y);
       y+=31;
     }
@@ -1593,7 +1644,9 @@ function render(t){
   const map=getMap(world.mapId),focus=scene.players.find(p=>p.id===session?.id)||(!session?scene.players[0]:null);
   updateMedkitProgress(focus);
   updateBuffHud(focus);
-  const physicalMap=mapWithMechanisms(map,scene.mechanisms,scene.bridgeHealth);
+  const state=scene.objective,objective=state&&getMapObjective(map);
+  const activeCover=objective?.concealment?cover=>objective.concealment(map,state,cover):undefined;
+  const physicalMap=physicalArena(map,scene.mechanisms,scene.bridgeHealth,state);
   updateInteractionPrompt(map);
   const touchAim=usesTouchAim();
   const aimX=session&&!touchAim?mouse.x:W/2+Math.cos(focus?.angle??0)*W/2;
@@ -1610,7 +1663,7 @@ function render(t){
   const angle=session&&focus?touchAim?focus.angle:pointerAimAngle(focus,map):0;
   const concealed=player=>!!session&&player.id!==focus?.id&&
     !(world.teams&&player.team===focus?.team)&&!(world.coop&&!player.bot)&&
-    isConcealedFrom(map,focus,player);
+    isArenaConcealed(map,state,focus,player);
   const players=renderPlayers(scene.players,dt,angle,physicalMap).map(player=>
     concealed(player)?{...player,coverOpacity:.08}:player);
   const draw3D=use3D(),skinEffects=showSkinEffects();
@@ -1623,6 +1676,7 @@ function render(t){
     drawTidalBridge(ctx,map,scene.bridgeHealth);
   }
   drawAtmosphere(map,t,view);
+  objective?.draw?.(ctx,map,state,{time:t*.001,view,animated:preferences.effects&&!reducedMotion.matches,viewer:focus});
   if(map.mechanisms?.length){
     drawMapMechanisms(ctx,map,scene.mechanisms,{
       time:t,view,animated:preferences.effects&&!reducedMotion.matches,
@@ -1669,7 +1723,7 @@ function render(t){
   ctx.restore();
   hud.clearRect(0,0,W,H);
   hud.save();hud.scale(zoom,zoom);hud.translate(-viewX,-viewY);
-  drawMapCovers(hud,map,{viewer:focus,view});
+  drawMapCovers(hud,map,{viewer:focus,view,isActive:activeCover,drawCover:objective?.drawCover??getMapObjective(map)?.drawCover});
   if(session&&!world.ended&&!battleLocked()&&world.coop?.phase!=='waiting'){
     drawMapPickups(hud,scene.pickups,view,{time:t,animate:skinEffects});
     if(skinEffects)drawPickupPulses(hud,scene.arenaEffects,scene.effectTime,view);
@@ -1701,6 +1755,7 @@ function render(t){
   }
   drawMinimap(hud,{map,physicalMap,players:session?scene.players.filter(player=>!concealed(player)):[],viewX:baseX,viewY:baseY,viewWidth:view.width,viewHeight:view.height,
     focus,width:W,height:H,unit,pixel,coop:!!world.coop,
+    markers:objective?.markers?.(map,state,focus),
     touch:touch&&session?(landscapeView.matches?'landscape':'portrait'):null});
   if(session&&!touchAim&&!world.ended&&!battleLocked()){const p=world.players.find(p=>p.id===session.id);if(p&&p.dead<=0){hud.save();hud.shadowColor='#132b1c';hud.shadowBlur=4;hud.strokeStyle='#e7fac0';hud.lineWidth=2;hud.beginPath();hud.arc(mouse.x,mouse.y,8,0,Math.PI*2);hud.stroke();line(hud,mouse.x-14,mouse.y,mouse.x-5,mouse.y,'#e7fac0',2);line(hud,mouse.x+5,mouse.y,mouse.x+14,mouse.y,'#e7fac0',2);line(hud,mouse.x,mouse.y-14,mouse.x,mouse.y-5,'#e7fac0',2);line(hud,mouse.x,mouse.y+5,mouse.x,mouse.y+14,'#e7fac0',2);hud.restore();}}
   if(holding('score')&&session&&!session.range&&!session.coop&&!battleLocked())drawScoreboard();

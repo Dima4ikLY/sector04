@@ -1,7 +1,8 @@
 import {FLIP_DURATION,ROUND,SLIDE_DURATION,clamp,weapons} from './engine.mjs';
 import {getMap} from './maps.mjs';
 import {advanceGrenade,GRENADE_EFFECT_DURATION,GRENADE_FUSE} from './grenade.mjs';
-import {mapWithMechanisms,PORTAL_FLASH_DURATION} from './map-interactives.mjs';
+import {PORTAL_FLASH_DURATION} from './map-interactives.mjs';
+import {getMapObjective,physicalArena} from './map-objectives.mjs';
 import {segmentHitsRect} from './geometry.mjs';
 import {PICKUP_NOTICE_DURATION,PICKUP_TYPES} from './pickups.mjs';
 
@@ -151,7 +152,11 @@ export class SnapshotBuffer {
         : {...state,y:mix(old.y,state.y,alpha)};
     });
     const bridgeHealth=b.world.bridgeHealth;
-    const map=mapWithMechanisms(getMap(a.world.mapId),mechanisms,bridgeHealth);
+    const layout=getMap(a.world.mapId);
+    const objective=a.world.objective&&b.world.objective
+      ? getMapObjective(layout)?.sample?.(a.world.objective,b.world.objective,alpha)??a.world.objective
+      : a.world.objective;
+    const map=physicalArena(layout,mechanisms,bridgeHealth,objective);
     const bullets=[],impacted=new Set();
     for(const effect of b.world.effects||[]){
       if(effect.bulletId!==undefined&&occurred(effect.time,worldTime))impacted.add(effect.bulletId);
@@ -173,7 +178,7 @@ export class SnapshotBuffer {
     }
     const grenades=sampleGrenades(a.world,b.world,worldTime,alpha,map);
     const pickups=samplePickups(a,b,time);
-    return applyMotionCues({...a.world,players,bullets,grenades,mechanisms,bridgeHealth,pickups},worldTime,b.world);
+    return applyMotionCues({...a.world,players,bullets,grenades,mechanisms,bridgeHealth,pickups,objective},worldTime,b.world);
   }
 }
 

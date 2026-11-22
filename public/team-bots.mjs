@@ -65,7 +65,7 @@ function observe(player,allies,enemies,route,obstacles,shotOriginHeight){
   return best;
 }
 
-function pathControls(player,point,map,world){
+export function pathControls(player,point,map,world){
   let dx=point.x-player.x;
   const dy=point.y-player.y;
   const lift=point.lift&&map.mechanisms?.find(mechanism=>mechanism.id===point.lift);

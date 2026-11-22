@@ -6,7 +6,8 @@ import path from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createWorld,addPlayer,step,weapons,startCoop,startMatch,finishDuelForfeit,COOP_CAPACITY} from './public/engine.mjs';
 import {armorForEquipment,helmetForEquipment,START_MEDKITS,START_WEAPON,medkits,rankUnlocksBetween} from './public/catalog.mjs';
-import {getMapsForMode,maps} from './public/maps.mjs';
+import {getMap,getMapsForMode,maps} from './public/maps.mjs';
+import {getMapObjective} from './public/map-objectives.mjs';
 import {ProfileStore,EconomyError} from './profiles.mjs';
 
 const root=fileURLToPath(new URL('./public/',import.meta.url));
@@ -190,6 +191,10 @@ export function createArenaServer({
     if(world.match?.mode==='1v1'){
       if(world.countdown)clearBattleCountdown(room);
       else finishDuelForfeit(world,1-s.player.team);
+    }
+    if(world.objective){
+      const map=getMap(world.mapId);
+      getMapObjective(map).remove?.(map,world.objective,world,s.player);
     }
     world.players=world.players.filter(player=>player.id!==s.player.id);
     const remaining=world.players.find(player=>!player.bot);
@@ -385,7 +390,7 @@ export function createArenaServer({
               if(waitMs!==null)room.searchEndsAt=now+waitMs;
               world.match={mode:matchMode,phase:'waiting',capacity:matchConfig.capacity,
                 remaining:waitMs===null?null:Math.ceil(waitMs/1000),...(privateMatch?{private:true}:{}),
-                ...(roomOptions.frags?{frags:roomOptions.frags}:{}),...(roomOptions.weapons?{weapons:roomOptions.weapons}:{}),...(botPresets[roomOptions.botDifficulty]??botPresets.easy)};
+                ...(roomOptions.frags&&!world.objective?{frags:roomOptions.frags}:{}),...(roomOptions.weapons?{weapons:roomOptions.weapons}:{}),...(botPresets[roomOptions.botDifficulty]??botPresets.easy)};
             }
             rooms.set(code,room);
           }
@@ -492,6 +497,8 @@ export function createArenaServer({
         '/map-interactives.mjs':'map-interactives.mjs','/tidal-station.mjs':'tidal-station.mjs','/pickups.mjs':'pickups.mjs','/pickup-effects.mjs':'pickup-effects.mjs','/covers.mjs':'covers.mjs',
         '/hud-metrics.mjs':'hud-metrics.mjs','/minimap.mjs':'minimap.mjs','/touch-input.mjs':'touch-input.mjs','/touch-layout.mjs':'touch-layout.mjs',
         '/team-bots.mjs':'team-bots.mjs','/team-routes.mjs':'team-routes.mjs',
+        '/map-objectives.mjs':'map-objectives.mjs','/mission-theater.mjs':'mission-theater.mjs',
+        '/mission-garden.mjs':'mission-garden.mjs','/mission-atlas.mjs':'mission-atlas.mjs',
         '/art/arena-atlas.png':'art/arena-atlas.png','/audio/weapon-shots.wav':'audio/weapon-shots.wav',
         '/audio/mechanisms.wav':'audio/mechanisms.wav','/audio/footsteps.wav':'audio/footsteps.wav',
         '/audio/jumps-landings.wav':'audio/jumps-landings.wav','/audio/bullet-impacts.wav':'audio/bullet-impacts.wav',

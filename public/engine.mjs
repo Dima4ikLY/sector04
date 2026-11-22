@@ -5,9 +5,9 @@ import {MEDKIT_LIMIT,medkits} from './catalog.mjs';
 import {hasLineOfSight,polygonContact,segmentHitsRect} from './geometry.mjs';
 import {advanceMechanisms,createMechanisms,mapWithMechanisms,nearbyMechanism,triggerMechanism,triggerPortal} from './map-interactives.mjs';
 import {BUFF_SPAWN,getMapBuffSpawns,getMapPickups,PICKUP_NOTICE_DURATION,PICKUP_TYPES} from './pickups.mjs';
-import {teamBotInput} from './team-bots.mjs';
+import {pathControls,teamBotInput} from './team-bots.mjs';
+import {getMapObjective,isArenaConcealed,physicalArena} from './map-objectives.mjs';
 import {deathFallContactDelay} from './death-motion.mjs';
-import {isConcealedFrom} from './covers.mjs';
 export const W=VIEW_W,H=VIEW_H,ROUND=180,TARGET=15;
 export const COOP_CAPACITY=3;
 const COOP_WAVES=3, COOP_BREAK=4;
@@ -61,8 +61,9 @@ export const weapons = [
 const colors = ['#bcf466','#fb8b51','#7bbaff','#d297ff','#ffd76d','#ff789d'];
 const rangeDistances = [0,180,320,480];
 export const clamp = (v,a,b) => Math.max(a,Math.min(b,v));
-export function createWorld(mapId='foundry',{range=false,coop=false,teamSize=0,timeSeconds}={}) {
+export function createWorld(mapId='foundry',{range=false,coop=false,teamSize=0,timeSeconds,objectives=true}={}) {
   const map=getMap(mapId);
+  const objective=objectives&&!range&&!coop&&getMapObjective(map);
   const mission=coop?{phase:'waiting',wave:0,totalWaves:COOP_WAVES,enemiesLeft:0,countdown:0,hostId:null,defeated:0}:null;
   const fixedRespawnMs=map.fixedBuffs===true?30_000:
     Number.isFinite(map.fixedBuffs)&&map.fixedBuffs>0?map.fixedBuffs*1000:0;
@@ -71,6 +72,7 @@ export function createWorld(mapId='foundry',{range=false,coop=false,teamSize=0,t
     .map(placement=>Object.hasOwn(medkits,placement.kind)?{...placement,remaining:0}:
       {...placement,remaining:0,respawnMs:fixedRespawnMs});
   const world={mapId:map.id,range,coop:mission,mechanisms:createMechanisms(map),pickups,time:Number.isFinite(timeSeconds)&&timeSeconds>0?timeSeconds:ROUND,players:[],bullets:[],grenades:[],effects:[],audioEvents:[],combatEvents:[],feed:[],ended:false,serial:0};
+  if(objective)world.objective=objective.create(map);
   if(map.tidal)world.bridgeHealth=Object.fromEntries(map.tidal.bridge.map(section=>[section.id,section.hp]));
   if(!range&&!fixedRespawnMs)mapBuffs.set(world,{locations:getMapBuffSpawns(map),nextAt:ROUND-BUFF_SPAWN.initialDelay,active:null,previous:null});
   if(teamSize===1||teamSize===2||teamSize===3)world.teams={size:teamSize,scores:[0,0],winner:null};
@@ -168,6 +170,10 @@ export function startMatch(world){
     world.players.some(player=>player.bot||(player.team!==0&&player.team!==1))||
     world.players[0].team===world.players[1].team))return false;
   for(const player of world.players)respawn(player,world);
+  if(world.objective) {
+    const map=getMap(world.mapId);
+    world.objective=getMapObjective(map).create(map);
+  }
   if(world.bridgeHealth)for(const section of getMap(world.mapId).tidal.bridge)world.bridgeHealth[section.id]=section.hp;
   const buff=mapBuffs.get(world);
   if(buff){
@@ -217,6 +223,8 @@ function startCoopWave(world){
   mission.countdown=0;
 }
 function finishRound(world,winner){
+  const objective=world.objective;
+  const objectiveRules=objective&&getMapObjective(getMap(world.mapId));
   finishGroundedDeathFalls(world);
   world.ended=true;
   for(const player of world.players){
@@ -226,11 +234,14 @@ function finishRound(world,winner){
   }
   if(world.teams){
     const [left,right]=world.teams.scores;
-    world.teams.winner=winner??(left===right?null:left>right?0:1);
+    world.teams.winner=winner!==undefined?winner:(left===right?null:left>right?0:1);
   }
   const players=world.coop?world.players.filter(player=>!player.bot):world.players;
-  world.results=rankPlayers(players).map(({id,name,kills,deaths,damageDealt,team,bot})=>({id,name,kills,deaths,damageDealt,
-    ...(world.teams?{team,bot}:{})}));
+  world.results=rankPlayers(players.map(player=>{
+    const {id,name,kills,deaths,damageDealt,team,bot}=player;
+    return {id,name,kills,deaths,damageDealt,bot,...(world.teams?{team}:{}),
+      ...(objectiveRules?.score?{objectiveScore:objectiveRules.score(objective,player)}:{})};
+  }));
 }
 function updateCoop(world,dt){
   const mission=world.coop;
@@ -776,13 +787,22 @@ function updatePickups(world,obstacles,dt){
     }
   }
 }
-export function botInput(p,world,dt=1/60,map=mapWithMechanisms(getMap(world.mapId),world.mechanisms)) {
-  if(world.teams){
+export function botInput(p,world,dt=1/60,map=physicalArena(getMap(world.mapId),world.mechanisms,world.bridgeHealth,world.objective)) {
+  const objective=world.objective&&getMapObjective(map);
+  const point=objective?.botTarget?.(map,world.objective,world,p);
+  if(world.teams&&!point){
     const input=teamBotInput(p,world,dt,map,shotOriginHeight);
     if(input)return input;
   }
-  const targets=world.players.filter(t=>t!==p&&t.dead<=0&&t.hp>0&&areOpponents(world,p,t)&&!isConcealedFrom(map,p,t)).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
-  const t=targets[0];if(!t){p.botTarget=undefined;return {reload:p.ammo===0};}
+  const targets=world.players.filter(t=>t!==p&&t.dead<=0&&t.hp>0&&areOpponents(world,p,t)&&
+    !isArenaConcealed(map,world.objective,p,t)).sort((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y));
+  const t=targets[0];
+  const objectiveMove=point?pathControls(p,point,map,world):null;
+  if(objectiveMove&&!p.previous.interact){
+    const nearby=objective.nearby?.(map,world.objective,p);
+    if(nearby&&!nearby.disabled&&point.interact&&(!point.id||point.id===nearby.id))objectiveMove.interact=true;
+  }
+  if(!t){p.botTarget=undefined;return {...objectiveMove,reload:p.ammo===0};}
   const dx=t.x-p.x,dy=t.y-p.y,muzzleHeight=shotOriginHeight(p.stance),aimY=dy+muzzleHeight-shotOriginHeight(t.stance);
   const cover=map.solids??[],obstacles=[...map.platforms,...cover];
   let clear=true;for(let i=1;i<20;i++){const x=p.x+dx*i/20,y=p.y-muzzleHeight+aimY*i/20;if(obstacles.some(s=>x>s.x&&x<s.x+s.w&&y>s.y&&y<s.y+s.h)){clear=false;break;}}
@@ -805,7 +825,10 @@ export function botInput(p,world,dt=1/60,map=mapWithMechanisms(getMap(world.mapI
   p.botReaction=Math.max(0,(p.botReaction??(botSkill.reaction??.8))-dt);
   const aim=Math.atan2(aimY,dx)+Math.sin(world.time*2.1+world.players.indexOf(p)*3)*(botSkill.aimWobble??.25);
   const burst=Math.sin(world.time*3+world.players.indexOf(p)*2)>.55;
-  return {left:moving&&dx<0,right:moving&&dx>0,crouch,prone,interact,jump:hop||(!crouch&&!prone&&dy<-60&&Math.sin(world.time*2+p.x)>.9),fire:p.botReaction<=0&&Math.hypot(dx,dy)<(botSkill.range??620)&&clear&&!blocked&&burst&&t.shield<=0,angle:aim,reload:p.ammo===0};
+  const move=objectiveMove??{left:moving&&dx<0,right:moving&&dx>0,crouch,prone,interact,
+    jump:hop||(!crouch&&!prone&&dy<-60&&Math.sin(world.time*2+p.x)>.9)};
+  return {...move,fire:p.botReaction<=0&&Math.hypot(dx,dy)<(botSkill.range??620)&&clear&&!blocked&&burst&&t.shield<=0,
+    angle:aim,reload:p.ammo===0};
 }
 function damageBridge(world,surface,amount){
   if(world.bridgeHealth?.[surface.id]>0){
@@ -849,14 +872,15 @@ export function step(world,dt) {
   if(world.ended||world.countdown||world.coop?.phase==='waiting'||world.match?.phase==='waiting')return;
   dt=Math.min(dt,1/30); world.time=Math.max(0,world.time-dt);
   const layout=getMap(world.mapId),mechanisms=world.mechanisms??[];
+  const state=world.objective,objective=state&&getMapObjective(layout);
   advanceMechanisms(layout,mechanisms,world.players,playerHalfWidth,dt,(kind,source,elapsed)=>{
     audioEvent(world,kind,source,undefined,world.time+dt-elapsed);
   });
-  const map=mapWithMechanisms(layout,mechanisms,world.bridgeHealth);
+  const map=physicalArena(layout,mechanisms,world.bridgeHealth,state);
   const platforms=map.platforms,obstacles=[...platforms,...(map.solids??[])];
   const solids=map.tidal?map.solids.filter(s=>!s.vertices):(map.solids??[]);
   const tidal=map.tidal,gravity=tidal?.gravity??playerGravity;
-  const activated=mechanisms.length?new Set():null;
+  const activated=mechanisms.length||objective?new Set():null;
   world.audioEvents=world.audioEvents.filter(event=>event.time-world.time<.6);
   world.combatEvents=world.combatEvents.filter(event=>event.time-world.time<.8);
   for(const p of world.players){
@@ -901,8 +925,13 @@ export function step(world,dt) {
     const treating=!!p.medkit;
     if(p.portalCooldown>0)p.portalCooldown=Math.max(0,p.portalCooldown-dt);
     if(activated&&interactionPressed(p,i.interact)){
-      const mechanism=nearbyMechanism(layout,mechanisms,p);
-      if(mechanism&&!activated.has(mechanism.state.id)&&interact(world,map,mechanisms,mechanism,p,world.time+dt))activated.add(mechanism.state.id);
+      const target=objective?.nearby?.(layout,state,p);
+      if(target){
+        if(!activated.has(target.id)&&objective.interact(layout,state,world,p,target)!==false)activated.add(target.id);
+      }else{
+        const mechanism=nearbyMechanism(layout,mechanisms,p);
+        if(mechanism&&!activated.has(mechanism.state.id)&&interact(world,map,mechanisms,mechanism,p,world.time+dt))activated.add(mechanism.state.id);
+      }
     }
     p.shield=Math.max(0,p.shield-dt);p.cool-=dt;p.grenadeCool-=dt;
     const allowedWeapons=world.match?.weapons;
@@ -1104,7 +1133,13 @@ export function step(world,dt) {
   }
   world.grenades=world.grenades.filter(g=>g.life>0);
   for(const e of world.effects)e.life-=dt;world.effects=world.effects.filter(e=>e.life>0);
-  if(world.coop)updateCoop(world,dt);
+  if(objective){
+    const outcome=objective.update(layout,state,world,dt)??(world.time<=0?objective.finish(layout,state,world):null);
+    if(outcome){
+      world.objectiveResult=outcome;
+      finishRound(world,outcome.team);
+    }
+  }else if(world.coop)updateCoop(world,dt);
   else if(world.time<=0||(!world.range&&(world.teams?.scores.some(score=>score>=(world.match?.frags??TARGET))
     ??world.players.some(player=>player.kills>=(world.match?.frags??TARGET)))))finishRound(world);
   if(!world.ended)advanceMedkits(world,dt);

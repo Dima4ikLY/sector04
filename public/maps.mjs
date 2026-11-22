@@ -1,4 +1,7 @@
 import {tidalStation} from './tidal-station.mjs';
+import {theaterMap} from './mission-theater.mjs';
+import {gardenMap} from './mission-garden.mjs';
+import {atlasMap} from './mission-atlas.mjs';
 
 export const VIEW_W=1440,VIEW_H=810;
 const freeForAllMaps=[
@@ -522,7 +525,7 @@ const meridianRift={
   ]
 };
 
-export const maps=[...freeForAllMaps,...teamMaps,nightFoundry,tidalStation,midnightFreight,polarStation,meridianRift];
+export const maps=[...freeForAllMaps,...teamMaps,nightFoundry,tidalStation,midnightFreight,polarStation,meridianRift,theaterMap,gardenMap,atlasMap];
 export const getMap=id=>maps.find(map=>map.id===id)||maps[0];
 export function getMapsForMode(mode='ffa'){
   return maps.filter(map=>map.modes?map.modes.includes(mode):(map.mode??'ffa')===mode);

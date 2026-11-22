@@ -2,6 +2,7 @@ import {arenaLooks,gradient,haze,lamp,line,mechanismAppearance,mechanismLights,p
 import {VIEW_W} from './maps.mjs';
 import {coverAt,getMapCovers} from './covers.mjs';
 import {projectTidalArt} from './tidal-art.mjs';
+import {getMapObjective} from './map-objectives.mjs';
 
 const atlasPanels = {foundry: [0, 0], canyon: [1, 0], harbor: [0, 1], dungeon: [1, 1]};
 const photoFocusY={foundry:.54,canyon:.4,harbor:.72,dungeon:.38,spillway:.86,observatory:.48};
@@ -532,14 +533,15 @@ function coverImage(cover,style){
 }
 
 // Draw on the foreground canvas, above both the flat and WebGL actors.
-export function drawMapCovers(ctx,map,{viewer=null,view=null}={}){
+export function drawMapCovers(ctx,map,{viewer=null,view=null,isActive,drawCover}={}){
   const ownCover=viewer&&coverAt(map,viewer.x,viewer.y);
   for(const cover of getMapCovers(map)){
     if(view&&(cover.x+cover.w<view.x||cover.x>view.x+view.width||cover.y<view.y||cover.y-cover.h>view.y+view.height))continue;
     ctx.save();
     // Fade the whole bush once; overlapping leaves must not compound opacity.
-    ctx.globalAlpha*=cover===ownCover ? .38 : .98;
-    ctx.drawImage(coverImage(cover,map.coverArt),cover.x-4,cover.y-cover.h-4);
+    ctx.globalAlpha*=cover===ownCover||isActive&&!isActive(cover)? .38 : .98;
+    if(drawCover)drawCover(ctx,cover);
+    else ctx.drawImage(coverImage(cover,map.coverArt),cover.x-4,cover.y-cover.h-4);
     ctx.restore();
   }
 }
@@ -646,7 +648,8 @@ export function drawTidalBridge(ctx,map,health){
 
 export function buildScenery(map, {includePlatforms = true, atlas = null, backdrop = null, preview = false} = {}) {
   const canvas = document.createElement('canvas');
-  const scale = map.tidal ? (preview ? 480/map.width : 1) : map.backdrop?.aligned&&backdrop ? 1 : map.zoom ? 2 : map.width > 1800 ? 1.25 : 1.5;
+  const drawBackdrop=getMapObjective(map)?.drawBackdrop;
+  const scale = map.missionArt ? (preview ? 480/map.width : 1) : map.tidal ? (preview ? 480/map.width : 1) : map.backdrop?.aligned&&backdrop ? 1 : map.zoom ? 2 : map.width > 1800 ? 1.25 : 1.5;
   canvas.width = map.width * scale;
   canvas.height = Math.round(map.height * scale);
   canvas.worldScale = scale;
@@ -657,6 +660,10 @@ export function buildScenery(map, {includePlatforms = true, atlas = null, backdr
   if(map.tidal){
     drawTidalTerrain(ctx,map);
     if(preview)drawTidalBridge(ctx,map);
+    return canvas;
+  }
+  if(drawBackdrop&&(map.missionArt||!backdrop)){
+    drawBackdrop(ctx,map,backdrop);
     return canvas;
   }
   if(map.backdrop?.aligned&&backdrop){
