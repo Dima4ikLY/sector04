@@ -31,11 +31,13 @@ import {measureHud} from './hud-metrics.mjs';
 import {drawMinimap} from './minimap.mjs';
 import {pickBattleTip} from './battle-tips.mjs';
 import {advanceBattleCue,BATTLE_START_NOTICE_MS} from './battle-cues.mjs';
-import {createTouchPresses,nearestVisibleAimPoint,sampleJoystick} from './touch-input.mjs';
+import {createTouchPresses,nearestVisibleAimPoint,sampleDpad} from './touch-input.mjs';
 import {createTouchLayoutEditor} from './touch-layout.mjs';
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');
 const hudCanvas=$('hudCanvas'),hud=hudCanvas.getContext('2d');
 const battleSurface=$('battleSurface');
+const touchDpad=$('touchDpad'),dpadButtons=[...touchDpad.querySelectorAll('[data-direction]')];
+const dpadPointers=new Map();
 const arenaExpanded=()=>document.fullscreenElement===battleSurface||battleSurface.hasAttribute('data-expanded');
 let wantsBattleFullscreen=false,fullscreenRequestPending=false;
 let touchLayoutPreview=false;
@@ -64,7 +66,7 @@ const touchMedia=matchMedia('(any-pointer: coarse), (max-width: 650px), (max-wid
 let world=createWorld(),session=null,stream=null,joining=false,mouse={x:W*.7,y:H*.5},last=performance.now(),lastState=0,touch=touchMedia.matches;
 let mouseAim=false;
 const usesTouchAim=()=>touch&&!mouseAim;
-let inputPending=false,toastTimer,progressWarning=false,selectedMatchMode='ffa',selectedMap=getMapsForMode()[0].id,bg=null,grenadePending=false,bg3D=false,stalled=false,fpsTime=null,fpsFrames=0,leaving=null,touchJoystick;
+let inputPending=false,toastTimer,progressWarning=false,selectedMatchMode='ffa',selectedMap=getMapsForMode()[0].id,bg=null,grenadePending=false,bg3D=false,stalled=false,fpsTime=null,fpsFrames=0,leaving=null;
 let preferences=readSettings();
 const shouldDrawArena=createFrameLimiter();
 const motion=new SnapshotBuffer();
@@ -405,8 +407,9 @@ $('rangeWeapon').addEventListener('change',event=>{
 });
 function clearControls(){
   keys.clear();touchKeys.clear();slideGesture.reset();grenadePending=false;medkitPending=null;proneRequested=false;requestedInteraction=0;flipPending=null;
+  dpadPointers.clear();
+  for(const button of dpadButtons)button.setAttribute('aria-pressed','false');
   for(const [control,pointer] of touchPresses.reset())if(control.hasPointerCapture(pointer))control.releasePointerCapture(pointer);
-  if(touchJoystick)resetJoystick();
 }
 const waitingForMatch=()=>world.match?.phase==='waiting';
 const battleLocked=()=>waitingForMatch()||!!world.countdown;
@@ -950,43 +953,46 @@ $('viewport').addEventListener('wheel',event=>{
   if(cycleWeapon(Math.sign(event.deltaY)))event.preventDefault();
 },{passive:false});
 $('weaponNext').onclick=()=>cycleWeapon(1);
-touchJoystick=$('touchJoystick');
-let joystickState={},touchJumpDown=false;
-function resetJoystick(){
-  joystickState={};
-  touchKeys.delete('left');touchKeys.delete('right');touchKeys.delete('jump');touchKeys.delete('crouch');
-  touchJoystick?.style.setProperty('--stick-x','0px');touchJoystick?.style.setProperty('--stick-y','0px');
-}
-function updateJoystick(event){
-  const box=touchJoystick.getBoundingClientRect(),radius=Math.min(box.width,box.height)*.34;
-  const dx=event.clientX-(box.left+box.width/2),dy=event.clientY-(box.top+box.height/2);
-  const {x,y,actions:next}=sampleJoystick(dx,dy,radius,joystickState);
-  if((next.left&&!joystickState.left)||(next.right&&!joystickState.right))tapTouchMovement(next.left?'left':'right');
-  if(next.jump&&!joystickState.jump){
+let touchJumpDown=false;
+function updateDpad(){
+  const next=new Set();
+  for(const directions of dpadPointers.values())for(const direction of directions)next.add(direction);
+  if(next.has('left')!==next.has('right'))tapTouchMovement(next.has('left')?'left':'right');
+  if(next.has('jump')&&!touchKeys.has('jump')){
     touchPresses.queue('jump');
-    touchJumpDown=holding('crouch')||touchKeys.has('down');
+    touchJumpDown=next.has('crouch')||holding('crouch')||touchKeys.has('down');
   }
-  joystickState=next;
-  for(const action of ['left','right','jump','crouch']){
-    if(next[action])touchKeys.add(action);
+  for(const button of dpadButtons){
+    const action=button.dataset.direction,pressed=next.has(action);
+    if(pressed)touchKeys.add(action);
     else touchKeys.delete(action);
+    const state=String(pressed);
+    if(button.getAttribute('aria-pressed')!==state)button.setAttribute('aria-pressed',state);
   }
-  touchJoystick.style.setProperty('--stick-x',`${x}px`);touchJoystick.style.setProperty('--stick-y',`${y}px`);
 }
-touchJoystick.addEventListener('pointerdown',event=>{
-  event.preventDefault();
-  if(event.button!==0||!canControl()||!touchPresses.claim(touchJoystick,event.pointerId))return;
-  mouseAim=false;
-  proneRequested=false;touchJoystick.setPointerCapture(event.pointerId);updateJoystick(event);
-});
-touchJoystick.addEventListener('pointermove',event=>{
-  if(touchPresses.owns(touchJoystick,event.pointerId))updateJoystick(event);
-});
-for(const type of ['pointerup','pointercancel','lostpointercapture'])touchJoystick.addEventListener(type,event=>{
-  if(!touchPresses.release(touchJoystick,event.pointerId))return;
-  if(type!=='pointerup')touchPresses.cancel('jump');
-  resetJoystick();
-});
+for(const button of dpadButtons){
+  button.addEventListener('pointerdown',event=>{
+    event.preventDefault();
+    if(event.button!==0||!canControl()||!touchPresses.claim(button,event.pointerId))return;
+    mouseAim=false;
+    proneRequested=false;
+    button.setPointerCapture(event.pointerId);
+    dpadPointers.set(event.pointerId,[button.dataset.direction]);
+    updateDpad();
+  });
+  button.addEventListener('pointermove',event=>{
+    if(!touchPresses.owns(button,event.pointerId))return;
+    dpadPointers.set(event.pointerId,sampleDpad(event.clientX,event.clientY,touchDpad.getBoundingClientRect()));
+    updateDpad();
+  });
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(type,event=>{
+    if(!touchPresses.release(button,event.pointerId))return;
+    const wasJumping=touchKeys.has('jump');
+    dpadPointers.delete(event.pointerId);
+    updateDpad();
+    if(type!=='pointerup'&&wasJumping&&!touchKeys.has('jump'))touchPresses.cancel('jump');
+  });
+}
 $('flipButton').addEventListener('click',event=>{if(event.detail===0)requestFlip();});
 document.querySelectorAll('[data-control]:not([data-control="weapon"])').forEach(button=>{
   const control=button.dataset.control;
@@ -1000,8 +1006,7 @@ document.querySelectorAll('[data-control]:not([data-control="weapon"])').forEach
       proneRequested=!proneRequested;
       return;
     }
-    if(['crouch','jump','jet'].includes(control))proneRequested=false;
-    tapTouchMovement(control);
+    if(control==='jet')proneRequested=false;
     touchKeys.add(control);
     if(control==='fire'||control==='reload')touchPresses.queue(control);
   });

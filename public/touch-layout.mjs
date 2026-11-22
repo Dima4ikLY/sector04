@@ -1,19 +1,25 @@
 const controlsByName={
-  joystick:'Джойстик',fire:'Огонь',grenade:'Граната',reload:'Перезарядка',
+  joystick:'Крестовина',fire:'Огонь',grenade:'Граната',reload:'Перезарядка',
   flip:'Сальто',jet:'Джетпак',prone:'Лечь / встать',weapon:'Смена оружия',down:'Спуск сквозь настил'
 };
 const clamp=value=>Math.min(1,Math.max(0,value));
+const minSize=75,maxSize=150,sizeStep=5,defaultSize=100;
+const positioned=point=>Number.isFinite(point?.x)&&Number.isFinite(point?.y);
+const controlSize=value=>Number.isFinite(value)
+  ?Math.min(maxSize,Math.max(minSize,Math.round(value/sizeStep)*sizeStep))
+  :defaultSize;
 
 export function normalizeTouchPositions(value){
   const positions={portrait:{},landscape:{}};
   for(const orientation of Object.keys(positions)){
     for(const name of Object.keys(controlsByName)){
       const point=value?.[orientation]?.[name];
-      const positioned=Number.isFinite(point?.x)&&Number.isFinite(point?.y);
-      if(!positioned&&point?.hidden!==true)continue;
+      const hasPosition=positioned(point),size=controlSize(point?.size);
+      if(!hasPosition&&point?.hidden!==true&&size===defaultSize)continue;
       positions[orientation][name]={
-        ...(positioned?{x:clamp(point.x),y:clamp(point.y)}:{}),
-        ...(point.hidden===true?{hidden:true}:{})
+        ...(hasPosition?{x:clamp(point.x),y:clamp(point.y)}:{}),
+        ...(point.hidden===true?{hidden:true}:{}),
+        ...(size!==defaultSize?{size}:{})
       };
     }
   }
@@ -37,36 +43,51 @@ export function createTouchLayoutEditor({surface,controls,bounds,tools,read,save
   const landscape=matchMedia('(orientation: landscape)');
   const orientation=()=>landscape.matches?'landscape':'portrait';
   const items=new Map([
-    ['joystick',controls.querySelector('#touchJoystick')],
+    ['joystick',controls.querySelector('#touchDpad')],
     ...Array.from(controls.querySelectorAll('[data-control]'),button=>[button.dataset.control,button])
   ]);
   const selectedControl=tools.querySelector('#touchLayoutSelected');
   const visibility=tools.querySelector('#touchLayoutVisibility');
   const orientationName=tools.querySelector('#touchLayoutOrientation');
-  const joystick=items.get('joystick');
+  const sizeInput=tools.querySelector('#touchLayoutSize');
+  const sizeValue=tools.querySelector('#touchLayoutSizeValue');
+  const dpad=items.get('joystick');
+  sizeInput.min=String(minSize);
+  sizeInput.max=String(maxSize);
+  sizeInput.step=String(sizeStep);
   for(const [name] of items)selectedControl.add(new Option(controlsByName[name],name));
   let draft=null,selected='joystick',drag=null;
 
   function refresh(){
     const side=orientation();
     const layout=(draft??read())?.[side]??{};
-    const area=bounds.getBoundingClientRect();
     for(const [name,control] of items){
       const position=layout[name];
       control.toggleAttribute('data-layout-hidden',position?.hidden===true);
       control.toggleAttribute('data-layout-selected',!!draft&&name===selected);
-      if(!Number.isFinite(position?.x)||!position||!area.width||!area.height){
+      const size=controlSize(position?.size);
+      if(size===defaultSize)control.style.removeProperty('--layout-size');
+      else control.style.setProperty('--layout-size',String(size/100));
+    }
+    const area=bounds.getBoundingClientRect();
+    for(const [name,control] of items){
+      const position=layout[name];
+      const hasPosition=positioned(position);
+      if((!hasPosition&&controlSize(position?.size)===defaultSize)||!area.width||!area.height){
         control.style.removeProperty('--layout-x');
         control.style.removeProperty('--layout-y');
         continue;
       }
       const rect=control.getBoundingClientRect();
       if(!rect.width||!rect.height)continue;
-      const desired=controlCenter(area,rect.width,rect.height,position);
       const offsetX=parseFloat(control.style.getPropertyValue('--layout-x'))||0;
       const offsetY=parseFloat(control.style.getPropertyValue('--layout-y'))||0;
-      control.style.setProperty('--layout-x',`${desired.x-rect.left-rect.width/2+offsetX}px`);
-      control.style.setProperty('--layout-y',`${desired.y-rect.top-rect.height/2+offsetY}px`);
+      // Individual CSS translation leaves the scaled bounds centered on the original slot.
+      const baseX=rect.left+rect.width/2-offsetX,baseY=rect.top+rect.height/2-offsetY;
+      const point=hasPosition?position:controlPosition(area,rect.width,rect.height,baseX,baseY);
+      const desired=controlCenter(area,rect.width,rect.height,point);
+      control.style.setProperty('--layout-x',`${desired.x-baseX}px`);
+      control.style.setProperty('--layout-y',`${desired.y-baseY}px`);
     }
     if(!draft)return;
     orientationName.textContent=side==='landscape'?'Альбомная':'Портретная';
@@ -75,6 +96,9 @@ export function createTouchLayoutEditor({surface,controls,bounds,tools,read,save
       option.text=controlsByName[option.value]+(layout[option.value]?.hidden?' · скрыто':'');
     }
     visibility.textContent=layout[selected]?.hidden?'Показать':'Скрыть';
+    const size=controlSize(layout[selected]?.size);
+    sizeInput.value=String(size);
+    sizeValue.textContent=`${size}%`;
   }
   const resize=new ResizeObserver(refresh);
   for(const element of [bounds,controls,...items.values()])resize.observe(element);
@@ -91,7 +115,7 @@ export function createTouchLayoutEditor({surface,controls,bounds,tools,read,save
     draft=normalizeTouchPositions(read());
     selected='joystick';
     surface.setAttribute('data-touch-editing','');
-    joystick.tabIndex=0;
+    dpad.tabIndex=0;
     tools.hidden=false;
     onEdit(true);
     refresh();
@@ -102,14 +126,14 @@ export function createTouchLayoutEditor({surface,controls,bounds,tools,read,save
     releaseDrag();
     draft=null;
     surface.removeAttribute('data-touch-editing');
-    joystick.removeAttribute('tabindex');
+    dpad.removeAttribute('tabindex');
     tools.hidden=true;
     onEdit(false);
     refresh();
   }
   function itemAt(target){
-    const item=target.closest('#touchJoystick,[data-control]');
-    return item===joystick?'joystick':item?.dataset.control;
+    const item=target.closest('#touchDpad,[data-control]');
+    return item===dpad?'joystick':item?.dataset.control;
   }
   function place(name,control,x,y){
     const rect=control.getBoundingClientRect(),layout=draft[orientation()];
@@ -159,6 +183,15 @@ export function createTouchLayoutEditor({surface,controls,bounds,tools,read,save
     place(name,control,rect.left+rect.width/2+delta[0],rect.top+rect.height/2+delta[1]);
   });
   selectedControl.addEventListener('change',()=>{selected=selectedControl.value;refresh();});
+  sizeInput.addEventListener('input',()=>{
+    if(!draft)return;
+    releaseDrag();
+    const position=draft[orientation()][selected]??={};
+    const size=controlSize(Number(sizeInput.value));
+    if(size===defaultSize)delete position.size;
+    else position.size=size;
+    refresh();
+  });
   visibility.addEventListener('click',()=>{
     if(!draft)return;
     const layout=draft[orientation()];
@@ -169,6 +202,7 @@ export function createTouchLayoutEditor({surface,controls,bounds,tools,read,save
   });
   tools.querySelector('#touchLayoutReset').addEventListener('click',()=>{
     if(!draft)return;
+    releaseDrag();
     draft[orientation()]={};
     refresh();
   });

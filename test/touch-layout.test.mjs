@@ -20,10 +20,21 @@ test('old settings still load and both layouts survive a persistence round trip'
   const original=readSettings(storage);
   assert.equal(original.touchLayout,'right');
   assert.deepEqual(original.touchPositions,{portrait:{},landscape:{}});
-  const touchPositions={portrait:{grenade:{hidden:true}},landscape:{fire:{x:.9,y:.85}}};
+  const touchPositions={portrait:{grenade:{hidden:true,size:85}},landscape:{fire:{x:.9,y:.85,size:135}}};
   saveSettings({...original,touchPositions},storage);
   assert.equal(readSettings(storage).volume,10);
   assert.deepEqual(readSettings(storage).touchPositions,touchPositions);
+});
+
+test('button sizes are rounded and clamped without materializing default positions',()=>{
+  const positions=normalizeTouchPositions({
+    portrait:{fire:{size:72},joystick:{size:167},weapon:{size:103},jet:{size:100}},
+    landscape:{fire:{x:.25,y:.75,size:114},grenade:{hidden:true,size:'115'},reload:{size:Infinity}}
+  });
+  assert.deepEqual(positions,{
+    portrait:{fire:{size:75},joystick:{size:150},weapon:{size:105}},
+    landscape:{fire:{x:.25,y:.75,size:115},grenade:{hidden:true}}
+  });
 });
 
 test('dragging to the screen edge keeps the entire control inside the safe area',()=>{
@@ -33,4 +44,14 @@ test('dragging to the screen edge keeps the entire control inside the safe area'
   assert.deepEqual(controlCenter(area,76,80,position),{x:50,y:618});
   const rotated={left:50,top:108,width:710,height:260};
   assert.deepEqual(controlCenter(rotated,44,44,position),{x:72,y:346});
+});
+
+test('a larger control keeps its normalized position and fits at the new edge',()=>{
+  const area={left:12,top:108,width:354,height:550};
+  const position={x:1,y:0};
+  const normal=controlCenter(area,50,50,position);
+  const enlarged=controlCenter(area,75,75,position);
+  assert.deepEqual(normal,{x:341,y:133});
+  assert.deepEqual(enlarged,{x:328.5,y:145.5});
+  assert.deepEqual(controlPosition(area,75,75,enlarged.x,enlarged.y),position);
 });

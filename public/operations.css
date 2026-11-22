@@ -1617,8 +1617,9 @@ html[data-touch-combat] .arena-top > span { min-width: 0; overflow: hidden; text
 html[data-touch-combat] #fullscreen { width: 38px; height: 36px; font-size: 19px; }
 html[data-touch-combat] .controls-strip { display: none; }
 
-html[data-touch-combat] .battle-surface {
-  --touch-size: clamp(72px, 23vw, 108px);
+html[data-touch-combat] .battle-surface,
+.battle-surface[data-touch-editing] {
+  --touch-size: clamp(96px, 31vw, 126px);
   --touch-action-size: clamp(36px, 10.7vw, 50px);
   --touch-gap: 5px;
   --touch-action-width: calc(4 * var(--touch-action-size) + 3 * var(--touch-gap));
@@ -1630,26 +1631,42 @@ html[data-touch-combat] .battle-surface {
   z-index: 4;
 }
 .battle-surface:has(.result:not([hidden])) > .touch-controls { display: none; }
-.battle-surface .touch-joystick {
+.battle-surface .touch-dpad {
   position: relative;
   display: grid;
-  place-items: center;
+  grid-template-areas: ". jump ." "left . right" ". crouch .";
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: 3px;
   width: var(--touch-size);
   height: var(--touch-size);
   flex: none;
-  pointer-events: auto;
+  pointer-events: none;
   touch-action: none;
   user-select: none;
 }
-.touch-joystick-ring,
-.touch-joystick-knob {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
+.touch-dpad [data-direction="jump"] { grid-area: jump; }
+.touch-dpad [data-direction="left"] { grid-area: left; }
+.touch-dpad [data-direction="right"] { grid-area: right; }
+.touch-dpad [data-direction="crouch"] { grid-area: crouch; }
+.battle-surface .touch-dpad button {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border-color: #8da3b1;
+  border-radius: 8px;
+  background: #152735e8;
+  color: #fff0dc;
+  font: 700 20px/1 var(--mono);
+  pointer-events: auto;
+  touch-action: none;
 }
-.touch-joystick-ring { inset: 0; border: 1px solid #b4c0c8a8; background: #12202ab8; box-shadow: inset 0 0 0 8px #ffffff08, 0 4px 14px #0005; }
-.touch-joystick-knob { width: 45%; height: 45%; border: 1px solid #ffd397; background: #344350ed; transform: translate(var(--stick-x, 0px), var(--stick-y, 0px)); box-shadow: 0 3px 8px #0006; }
-.touch-joystick-hint { position: relative; color: #dbe7ed99; font: 700 16px/1 var(--mono); pointer-events: none; }
+.battle-surface .touch-dpad button[aria-pressed="true"] { border-color: #ffd397; background: var(--accent); color: #231708; }
+.battle-surface .touch-controls button:active { transform: none; }
 .battle-surface .touch-actions {
   display: grid;
   grid-template-columns: repeat(4, var(--touch-action-size));
@@ -1812,8 +1829,9 @@ html:not([data-touch-combat]) .battle-surface:is(:fullscreen,[data-expanded]) .v
 }
 
 @media (orientation: landscape) {
-  html[data-touch-combat] .battle-surface {
-    --touch-size: clamp(66px, 23dvh, 104px);
+  html[data-touch-combat] .battle-surface,
+  .battle-surface[data-touch-editing] {
+    --touch-size: clamp(90px, 29dvh, 122px);
     --touch-action-size: clamp(36px, 11.7dvh, 48px);
   }
   html[data-touch-combat] .battle-surface > .viewport {
@@ -1853,7 +1871,7 @@ html:not([data-touch-combat]) .battle-surface:is(:fullscreen,[data-expanded]) .v
 html:not([data-touch-combat]) .settings-dialog .settings-touch-edit { display: none; }
 #touchLayoutBounds {
   position: absolute;
-  inset: calc(env(safe-area-inset-top) + 108px) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  inset: calc(env(safe-area-inset-top) + 144px) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   pointer-events: none;
 }
 #openTouchLayout {
@@ -1877,11 +1895,16 @@ html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]):has(> #o
 @media (orientation: portrait) {
   html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]) .viewport #matchGoal { margin-inline-end: 0; }
 }
-.battle-surface .touch-controls :is(#touchJoystick,[data-control]) { translate: var(--layout-x, 0px) var(--layout-y, 0px); }
+.battle-surface .touch-controls :is(#touchDpad,[data-control]) {
+  translate: var(--layout-x, 0px) var(--layout-y, 0px);
+  scale: var(--layout-size, 1);
+}
 .battle-surface:not([data-touch-editing]) .touch-controls [data-layout-hidden] { visibility: hidden; pointer-events: none; }
 .battle-surface[data-touch-editing] > .touch-controls { display: flex; z-index: 23; }
 .battle-surface[data-touch-editing] .touch-actions [hidden] { display: grid !important; }
-.battle-surface[data-touch-editing] .touch-controls :is(#touchJoystick,[data-control]) { cursor: grab; touch-action: none; }
+.battle-surface[data-touch-editing] .touch-controls :is(#touchDpad,[data-control]) { cursor: grab; touch-action: none; }
+.battle-surface[data-touch-editing] .touch-dpad { pointer-events: auto; }
+.battle-surface[data-touch-editing] .touch-dpad button { pointer-events: none; }
 .battle-surface[data-touch-editing] .touch-controls [data-layout-selected] { z-index: 1; outline: 2px solid #ffcf90; outline-offset: 2px; }
 .battle-surface[data-touch-editing] .touch-controls [data-layout-hidden] { opacity: .55; outline: 1px dashed #f6dbb8; outline-offset: 1px; }
 .battle-surface[data-touch-editing] .touch-controls [data-layout-hidden][data-layout-selected] { outline: 2px dashed #ffcf90; }
@@ -1913,4 +1936,35 @@ html[data-touch-combat] .battle-surface:is(:fullscreen,[data-expanded]):has(> #o
   font-size: 12px;
 }
 .touch-layout-row #touchLayoutSave { border-color: #e6af6e; background: #ffd297; color: #27190b; font-weight: 700; }
+.touch-layout-size { min-height: 34px; }
+.touch-layout-size label { padding-inline: 3px; font-size: 12px; }
+.touch-layout-size input[type="range"] {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  accent-color: #ffd297;
+  background: transparent;
+}
+.touch-layout-size output {
+  min-width: 5ch;
+  text-align: right;
+  padding-inline: 2px;
+  font: 700 12px/1 var(--mono);
+}
 .touch-layout-tools p { margin: 4px 3px 0; color: #bac9d5; font-size: 10px; line-height: 1.2; }
+@media (orientation: landscape) and (min-width: 620px) {
+  #touchLayoutBounds { top: calc(env(safe-area-inset-top) + 108px); }
+  .touch-layout-tools {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, .65fr);
+    gap: 4px 8px;
+    width: min(calc(100% - 16px), 560px);
+  }
+  .touch-layout-tools :is(.touch-layout-row:first-child,p) { grid-column: 1 / -1; }
+  .touch-layout-tools .touch-layout-row,
+  .touch-layout-tools p { margin-top: 0; }
+}

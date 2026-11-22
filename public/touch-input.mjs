@@ -27,13 +27,15 @@ export function createTouchPresses(){
   };
 }
 
-export function sampleJoystick(dx,dy,radius,previous={}){
-  const distance=Math.hypot(dx,dy),scale=distance>radius?radius/distance:1;
-  const x=dx*scale,y=dy*scale;
-  // A lower release threshold keeps diagonal movement stable near sector edges.
-  const threshold=key=>radius*(previous[key] ? .22 : .30);
-  return {x,y,actions:{left:x<-threshold('left'),right:x>threshold('right'),
-    jump:y<-threshold('jump'),crouch:y>threshold('crouch')}};
+export function sampleDpad(x,y,{left,top,width,height}){
+  const column=(x-left)/width,row=(y-top)/height;
+  if(!(column>=0&&column<=1&&row>=0&&row<=1))return [];
+  const directions=[];
+  if(column<1/3)directions.push('left');
+  else if(column>2/3)directions.push('right');
+  if(row<1/3)directions.push('jump');
+  else if(row>2/3)directions.push('crouch');
+  return directions;
 }
 
 export function nearestVisibleAimPoint(origin,targets,obstacles){
